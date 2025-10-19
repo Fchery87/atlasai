@@ -7,6 +7,7 @@ import Editor, { DiffEditor } from "@monaco-editor/react";
 import { useProjectStore } from "./lib/store/projectStore";
 import { languageFromPath } from "./lib/editor/lang";
 import { useDebounced } from "./lib/hooks/useDebounced";
+import { SplitPane } from "./components/layout/SplitPane";
 
 function Header() {
   const { current } = useProjectStore();
@@ -207,6 +208,8 @@ function ChatPanel() {
   const [useTargetCurrentFile, setUseTargetCurrentFile] = React.useState<boolean>(true);
   const [maxContextChars, setMaxContextChars] = React.useState<number>(4000);
   const [contextExpanded, setContextExpanded] = React.useState<boolean>(false);
+  const [attachments, setAttachments] = React.useState<Array<{ name: string; type: string; size: number; text?: string; note?: string }>>([]);
+  const [maxAttachmentChars, setMaxAttachmentChars] = React.useState<number>(8000);
 
   React.useEffect(() => {
     if (currentFilePath) {
@@ -253,19 +256,29 @@ function ChatPanel() {
 
   const buildMessages = (): Array<{ role: "system" | "user" | "assistant"; content: string }> => {
     const msgs: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+    let sys = "";
     if (useContextFile && currentFilePath && currentFileContent) {
       const full = currentFileContent;
       const needsTruncate = !contextExpanded && full.length > maxContextChars;
       const slice = needsTruncate ? full.slice(0, Math.max(0, maxContextChars)) : full;
       const note = needsTruncate ? `\n\n[context truncated to ${slice.length} of ${full.length} chars]` : "";
-      msgs.push({
-        role: "system",
-        content:
-          `You are a coding assistant. The user is working on file ${currentFilePath} and wants to update ${targetPath}.\n` +
-          `Here is the current content of ${currentFilePath}:${note}\n` +
-          "```text\n" + slice + "\n```",
-      });
+      sys +=
+        `You are a coding assistant. The user is working on file ${currentFilePath} and wants to update ${targetPath}.\n` +
+        `Here is the current content of ${currentFilePath}:${note}\n` +
+        "```text\n" + slice + "\n```";
     }
+    if (attachments.length) {
+      const parts: string[] = [];
+      for (const a of attachments) {
+        if (a.text) {
+          parts.push(`Attachment ${a.name} (${a.type}, ${a.size} bytes):\n\`\`\`text\n${a.text}\n\`\`\``);
+        } else {
+          parts.push(`Attachment ${a.name} (${a.type}, ${a.size} bytes) included (binary or image omitted). ${a.note ?? ""}`.trim());
+        }
+      }
+      sys += (sys ? "\n\n" : "") + parts.join("\n\n");
+    }
+    if (sys) msgs.push({ role: "system", content: sys });
     msgs.push({ role: "user", content: prompt });
     return msgs;
   };
@@ -427,17 +440,74 @@ function ChatPanel() {
           </div>
           <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">{status}</div>
         </div>
-        <div className="flex gap-2">
-          <input
-            aria-label="Prompt"
-            className="flex-1 h-10 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            placeholder="Ask to edit code..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.currentTarget.value)}
-          />
-          <Button onClick={send} disabled={!prompt.trim() || streaming} aria-label="Send">
-            {streaming ? "Streaming..." : "Send"}
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              aria-label="Prompt"
+              className="flex-1 h-10 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              placeholder="Ask to edit code..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.currentTarget.value)}
+            />
+            <Button onClick={send} disabled={!prompt.trim() || streaming} aria-label="Send">
+              {streaming ? "Streaming..." : "Send"}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="Attach files"
+              type="file"
+              multiple
+              onChange={async (e) => {
+                const files = Array.from(e.currentTarget.files || []);
+                const newItems: Array<{ name: string; type: string; size: number; text?: string; note?: string }> = [];
+                for (const f of files) {
+                  const isText = f.type.startsWith("text/") || [".js",".ts",".tsx",".jsx",".json",".css",".html",".md",".yml",".yaml",".py",".sh",".bash"].some(ext => f.name.endsWith(ext));
+                  if (isText) {
+                    const txt = await f.text();
+                    const sliced = txt.slice(0, maxAttachmentChars);
+                    const note = txt.length > maxAttachmentChars ? `truncated to ${sliced.length} of ${txt.length} chars` : undefined;
+                    newItems.push({ name: f.name, type: f.type || "text/plain", size: f.size, text: sliced, note });
+                  } else {
+                    newItems.push({ name: f.name, type: f.type || "application/octet-stream", size: f.size, note: "binary/image omitted" });
+                  }
+                }
+                setAttachments(prev => [...prev, ...newItems]);
+                // reset
+                (e.target as HTMLInputElement).value = "";
+              }}
+            />
+            <label className="text-xs flex items-center gap-1" title="Max characters read from each text attachment">
+              <span>Max attach</span>
+              <input
+                className="h-7 w-20 rounded-md border border-input px-2 text-xs"
+                type="number"
+                min={1000}
+                step={1000}
+                value={maxAttachmentChars}
+                onChange={(e) => setMaxAttachmentChars(Math.max(0, Number(e.currentTarget.value || 0)))}
+                aria-label="Max attachment characters"
+              />
+            </label>
+            {attachments.length > 0 && (
+              <Button variant="ghost" size="sm" aria-label="Clear attachments" onClick={() => setAttachments([])}>Clear attachments</Button>
+            )}
+          </div>
+          {attachments.length > 0 && (
+            <div className="text-xs border rounded-md p-2 max-h-28 overflow-auto">
+              <div className="font-medium mb-1">Attachments</div>
+              <ul className="space-y-1">
+                {attachments.map((a, idx) => (
+                  <li key={idx} className="flex items-center justify-between gap-2">
+                    <div className="truncate">
+                      {a.name} <span className="text-muted-foreground">({a.type || "unknown"}, {a.size} bytes{a.note ? `, ${a.note}` : ""})</span>
+                    </div>
+                    <Button variant="ghost" size="sm" aria-label={`Remove ${a.name}`} onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}>Remove</Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <Separator className="my-1" />
         <div className="text-xs font-medium">Assistant output (editable)</div>
@@ -642,26 +712,28 @@ export default function App() {
             <CardContent><DeployPanel /></CardContent>
           </Card>
         </section>
-        <section aria-label="Workbench" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader><CardTitle>Files</CardTitle></CardHeader>
-              <CardContent><FileTree /></CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Snapshots</CardTitle></CardHeader>
-              <CardContent><SnapshotList /></CardContent>
-            </Card>
-            <TerminalPanel />
-          </div>
-          <div className="space-y-4 lg:col-span-1">
-            <EditorPanel />
-            <DiffPanel />
-          </div>
-          <div className="space-y-4 lg:col-span-1">
-            <ChatPanel />
-            <PreviewPanel />
-          </div>
+        <section aria-label="Workbench" className="h-[70vh]">
+          <SplitPane dir="vertical" sizes={[26, 38, 36]} storageKey="bf_split_workbench">
+            <div className="pr-2 space-y-4">
+              <Card>
+                <CardHeader><CardTitle>Files</CardTitle></CardHeader>
+                <CardContent><FileTree /></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Snapshots</CardTitle></CardHeader>
+                <CardContent><SnapshotList /></CardContent>
+              </Card>
+              <TerminalPanel />
+            </div>
+            <div className="px-2 space-y-4">
+              <EditorPanel />
+              <DiffPanel />
+            </div>
+            <div className="pl-2 space-y-4">
+              <ChatPanel />
+              <PreviewPanel />
+            </div>
+          </SplitPane>
         </section>
       </main>
       <CommandPalette open={open} onClose={() => setOpen(false)} />
