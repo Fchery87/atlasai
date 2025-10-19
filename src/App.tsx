@@ -204,10 +204,15 @@ function ChatPanel() {
   const [targetPath, setTargetPath] = React.useState<string>(currentFilePath || "index.html");
   const [status, setStatus] = React.useState<string>("");
   const [useContextFile, setUseContextFile] = React.useState<boolean>(true);
+  const [useTargetCurrentFile, setUseTargetCurrentFile] = React.useState<boolean>(true);
+  const [maxContextChars, setMaxContextChars] = React.useState<number>(4000);
+  const [contextExpanded, setContextExpanded] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    if (currentFilePath) setTargetPath(currentFilePath);
-  }, [currentFilePath]);
+    if (currentFilePath) {
+      if (useTargetCurrentFile) setTargetPath(currentFilePath);
+    }
+  }, [currentFilePath, useTargetCurrentFile]);
 
   type AdapterBundle = {
     def: import("./lib/providers/types").ProviderDefinition;
@@ -249,12 +254,16 @@ function ChatPanel() {
   const buildMessages = (): Array<{ role: "system" | "user" | "assistant"; content: string }> => {
     const msgs: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
     if (useContextFile && currentFilePath && currentFileContent) {
+      const full = currentFileContent;
+      const needsTruncate = !contextExpanded && full.length > maxContextChars;
+      const slice = needsTruncate ? full.slice(0, Math.max(0, maxContextChars)) : full;
+      const note = needsTruncate ? `\n\n[context truncated to ${slice.length} of ${full.length} chars]` : "";
       msgs.push({
         role: "system",
         content:
           `You are a coding assistant. The user is working on file ${currentFilePath} and wants to update ${targetPath}.\n` +
-          `Here is the current content of ${currentFilePath}:\n` +
-          "```text\n" + currentFileContent + "\n```",
+          `Here is the current content of ${currentFilePath}:${note}\n` +
+          "```text\n" + slice + "\n```",
       });
     }
     msgs.push({ role: "user", content: prompt });
@@ -375,17 +384,48 @@ function ChatPanel() {
             </select>
           </label>
         </div>
-        <div className="flex items-center justify-between">
-          <label className="text-xs flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={useContextFile}
-              onChange={(e) => setUseContextFile(e.currentTarget.checked)}
-              aria-label="Use selected file as context"
-            />
-            Use selected file as context
-          </label>
-          <div className="text-xs text-muted-foreground" aria-live="polite">{status}</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+          <div className="flex items-center gap-3">
+            <label className="text-xs flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useContextFile}
+                onChange={(e) => setUseContextFile(e.currentTarget.checked)}
+                aria-label="Use selected file as context"
+              />
+              Use selected file as context
+            </label>
+            <label className="text-xs flex items-center gap-1" title="Maximum characters from the context file to include">
+              <span>Max ctx</span>
+              <input
+                className="h-7 w-20 rounded-md border border-input px-2 text-xs"
+                type="number"
+                min={500}
+                step={500}
+                value={maxContextChars}
+                onChange={(e) => setMaxContextChars(Math.max(0, Number(e.currentTarget.value || 0)))}
+                aria-label="Max context characters"
+              />
+            </label>
+            {useContextFile && currentFileContent.length > maxContextChars && !contextExpanded && (
+              <Button variant="ghost" size="sm" onClick={() => setContextExpanded(true)} aria-label="Show full context">Show full</Button>
+            )}
+            {useContextFile && contextExpanded && currentFileContent.length > maxContextChars && (
+              <Button variant="ghost" size="sm" onClick={() => setContextExpanded(false)} aria-label="Show less context">Show less</Button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useTargetCurrentFile}
+                onChange={(e) => setUseTargetCurrentFile(e.currentTarget.checked)}
+                aria-label="Use current file as target"
+              />
+              Use current file as target
+            </label>
+          </div>
+          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">{status}</div>
         </div>
         <div className="flex gap-2">
           <input
@@ -419,6 +459,8 @@ function ChatPanel() {
             placeholder="Target file path"
             value={targetPath}
             onChange={(e) => setTargetPath(e.currentTarget.value)}
+            disabled={useTargetCurrentFile}
+            title={useTargetCurrentFile ? "Using current file as target" : "Set a custom target file"}
           />
           <Button
             variant="secondary"
