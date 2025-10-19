@@ -195,16 +195,123 @@ function DiffPanel() {
 }
 
 function ChatPanel() {
+  const { currentFilePath, stageDiff } = useProjectStore();
   const [prompt, setPrompt] = React.useState("");
+  const [providerId, setProviderId] = React.useState<string>("openrouter");
+  const [model, setModel] = React.useState<string>("");
+  const [streaming, setStreaming] = React.useState(false);
+  const [output, setOutput] = React.useState("");
+  const [targetPath, setTargetPath] = React.useState<string>(currentFilePath || "index.html");
+  const [status, setStatus] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (currentFilePath) setTargetPath(currentFilePath);
+  }, [currentFilePath]);
+
+  type AdapterBundle = {
+    def: import("./lib/providers/types").ProviderDefinition;
+    adapter: import("./lib/providers/types").ProviderAdapter;
+    needsKey: boolean;
+  };
+
+  const registry: Record<string, AdapterBundle> = React.useMemo(() => {
+    const { OpenRouterDef, OpenRouterAdapter } = require("./lib/providers/openrouter");
+    const { OllamaDef, OllamaAdapter } = require("./lib/providers/ollama");
+    const { GroqDef, GroqAdapter } = require("./lib/providers/groq");
+    const { AnthropicDef, AnthropicAdapter } = require("./lib/providers/anthropic");
+    const { GPT5Def, GPT5Adapter } = require("./lib/providers/gpt5");
+    return {
+      openrouter: { def: OpenRouterDef, adapter: OpenRouterAdapter, needsKey: true },
+      ollama: { def: OllamaDef, adapter: OllamaAdapter, needsKey: false },
+      groq: { def: GroqDef, adapter: GroqAdapter, needsKey: true },
+      anthropic: { def: AnthropicDef, adapter: AnthropicAdapter, needsKey: true },
+      gpt5: { def: GPT5Def, adapter: GPT5Adapter, needsKey: false },
+    };
+  }, []);
+
+  const modelsForProvider = React.useMemo(() => {
+    const bundle = registry[providerId];
+    return bundle?.def.models?.map((m: any) => m.id) ?? [];
+  }, [registry, providerId]);
+
+  React.useEffect(() => {
+    if (!modelsForProvider.includes(model)) {
+      setModel(modelsForProvider[0] || "");
+    }
+  }, [modelsForProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const send = async () => {
+    const bundle = registry[providerId];
+    if (!bundle) return;
+    setStreaming(true);
+    setOutput("");
+    setStatus("Starting...");
+    let key = "";
+    if (bundle.needsKey) {
+      const { loadProviderKey } = await import("./lib/crypto/keys");
+      const k = await loadProviderKey(bundle.def.id);
+      if (!k.plaintext) {
+        setStatus("Missing API key for provider");
+        setStreaming(false);
+        return;
+      }
+      key = k.plaintext;
+    }
+    try {
+      const payload = {
+        model: model || (bundle.def.models[0]?.id ?? ""),
+        messages: [{ role: "user" as const, content: prompt }],
+      };
+      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload)) {
+        if (chunk.type === "text") {
+          setOutput((prev) => prev + chunk.data);
+        } else {
+          setStatus(chunk.data);
+        }
+      }
+      setStatus("Done");
+    } catch (e: any) {
+      setStatus(e?.message ?? "Stream failed");
+    } finally {
+      setStreaming(false);
+    }
+  };
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
         <CardTitle>Chat</CardTitle>
       </CardHeader>
-      <CardContent className="grow flex flex-col">
-        <div className="flex-1 text-sm text-muted-foreground">Assistant stream will appear here.</div>
-        <Separator className="my-2" />
-        <form className="flex gap-2" aria-label="Prompt input" onSubmit={(e) => e.preventDefault()}>
+      <CardContent className="grow flex flex-col gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+          <label className="text-xs">
+            Provider
+            <select
+              className="mt-1 w-full h-8 rounded-md border border-input px-2 text-sm"
+              aria-label="Provider"
+              value={providerId}
+              onChange={(e) => setProviderId(e.currentTarget.value)}
+            >
+              {Object.keys(registry).map((id) => (
+                <option key={id} value={id}>{registry[id].def.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs md:col-span-2">
+            Model
+            <select
+              className="mt-1 w-full h-8 rounded-md border border-input px-2 text-sm"
+              aria-label="Model"
+              value={model}
+              onChange={(e) => setModel(e.currentTarget.value)}
+            >
+              {modelsForProvider.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex gap-2">
           <input
             aria-label="Prompt"
             className="flex-1 h-10 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -212,8 +319,38 @@ function ChatPanel() {
             value={prompt}
             onChange={(e) => setPrompt(e.currentTarget.value)}
           />
-          <Button type="submit" disabled={!prompt.trim()}>Send</Button>
-        </form>
+          <Button onClick={send} disabled={!prompt.trim() || streaming} aria-label="Send">
+            {streaming ? "Streaming..." : "Send"}
+          </Button>
+        </div>
+        <div className="text-xs text-muted-foreground" aria-live="polite">{status}</div>
+        <Separator className="my-1" />
+        <div className="text-xs font-medium">Assistant output</div>
+        <textarea
+          aria-label="Assistant output"
+          className="w-full min-h-[120px] rounded-md border border-input p-2 text-sm font-mono"
+          value={output}
+          onChange={(e) => setOutput(e.currentTarget.value)}
+          placeholder="Model output will appear here..."
+        />
+        <div className="flex items-center gap-2">
+          <input
+            className="h-9 rounded-md border border-input px-3 text-sm"
+            aria-label="Target file path"
+            placeholder="Target file path"
+            value={targetPath}
+            onChange={(e) => setTargetPath(e.currentTarget.value)}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => targetPath && stageDiff(targetPath, output)}
+            disabled={!targetPath || !output}
+            title="Stage AI output as a change to the target file"
+          >
+            Stage to file
+          </Button>
+          <Button variant="ghost" onClick={() => setOutput("")} disabled={!output}>Clear</Button>
+        </div>
       </CardContent>
     </Card>
   );
