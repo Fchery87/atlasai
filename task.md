@@ -13,10 +13,10 @@ Legend:
 ## 6) Functional Requirements
 
 ### 6.1 Prompt → Code
-- [~] Chat panel UI
-  - [ ] Model picker per message
+- [x] Chat panel UI
+  - [x] Model picker per message
   - [ ] Attachments (images/files)
-  - [~] Streaming responses (providers support streaming; chat UI not yet wired)
+  - [x] Streaming responses (wired to providers)
   - [ ] Token/cost estimate in header
   - [ ] Stop/undo controls
 - [x] Diff approval step for changes generated (manual and snapshot-driven)
@@ -50,9 +50,9 @@ Legend:
 - [x] Provider Manager UI with key validate/save/clear (encrypted WebCrypto)
 - [x] OpenRouter adapter
 - [x] Ollama adapter
-- [ ] Groq adapter
-- [ ] Anthropic Claude Code adapter
-- [ ] GPT‑5 Codex placeholder adapter
+- [x] Groq adapter
+- [x] Anthropic Claude Code adapter
+- [x] GPT‑5 Codex placeholder adapter
 - [ ] Custom provider form (from schema)
 - [x] Credentials stored client-side encrypted; optional sync via OAuth not implemented
 
@@ -84,7 +84,7 @@ Legend:
 ## 10) Backend Architecture & Quality Specifications
 - [x] Storage: IndexedDB projects, encrypted localStorage for provider keys
 - [x] Serverless Worker: GitHub OAuth code exchange (PKCE) with CORS
-- [ ] Deploy status polling endpoint
+- [x] Deploy status polling endpoint
 - [ ] Optional LLM relay (BYOK-forwarding) with rate-limiting and scrubbing
 
 ## 12) CI/CD & Quality
@@ -96,7 +96,7 @@ Legend:
 
 ## 13) TDD Strategy
 - [x] Unit: crypto keys test, project store diffs/snapshots
-- [x] Unit: provider adapter tests (existing)
+- [x] Unit: provider adapter tests (existing + new providers)
 - [x] Unit: deploy and git helpers (zip pack, sha1, delete calc)
 - [x] E2E: smoke test; Axe accessibility tests on home, palette, snapshots, integrations
 - [ ] E2E: Prompt→Diff→Apply→Preview flow
@@ -122,10 +122,10 @@ Phase 2 (Git & Deploy)
 - [x] Git import/push (with deletes, .gitignore, encrypted config)
 - [x] Deploy presets (GH Pages, Netlify hash-based, Vercel link+config) with logs
 - [x] GH Pages CI workflow
-- [ ] Deploy status polling endpoint (optional)
+- [x] Deploy status polling endpoint (optional)
 
 Phase 3 (LLM Extensibility)
-- [ ] Additional providers (Groq, Anthropic Claude Code, GPT‑5 placeholder)
+- [x] Additional providers (Groq, Anthropic Claude Code, GPT‑5 placeholder)
 - [ ] Custom provider form w/ zod schema validation
 
 Phase 4 (Polish & Desktop)
@@ -136,14 +136,13 @@ Phase 4 (Polish & Desktop)
 
 ## 17) Acceptance Criteria (MVP)
 - [~] Create project → edit file → run preview → apply AI change → see diff → deploy to GH Pages
-  - Current status: All except “apply AI change” (chat→diff) wiring; deploy covered by GH Pages workflow
-- [~] Add provider via UI; validate key; use it in a chat that edits code
-  - Current status: Provider add/validate done; chat integration not wired
+  - Current status: Chat can stream and stage diffs; manual approve applies; GH Pages deploy workflow present. Add E2E to demarcate end-to-end.
+- [x] Add provider via UI; validate key; use it in a chat that edits code
 - [x] Critical flows keyboard-navigable; Axe checks pass for main screen and key interactions
 - [x] No server-side secret storage by default
 
 ## Summary
 - Phase 0 and Phase 1: COMPLETE.
-- Phase 2: Largely COMPLETE (OAuth exchange, Git import/push, deploy flows, GH Pages CI). Remaining: optional deploy status polling.
-- Provider extensibility (Phase 3): Pending.
-- Remaining polish: Split panes, templates gallery, security scanning in CI, precommit hooks, full E2E Prompt→Diff→Apply flow.
+- Phase 2: COMPLETE (OAuth exchange, Git import/push, deploy flows, GH Pages CI, optional deploy-status polling worker and UI).
+- Phase 3: Additional providers integrated; custom provider form pending.
+- Remaining polish: Split panes, templates gallery, security scanning in CI, precommit hooks, full E2E Prompt→Diff→Apply flow, custom provider schema form.
