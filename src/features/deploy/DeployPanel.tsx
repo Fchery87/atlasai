@@ -32,6 +32,9 @@ export function DeployPanel() {
   const [userRepoBranch, setUserRepoBranch] = React.useState<string>("main");
   const [defaultBranch, setDefaultBranch] = React.useState<string>("main");
 
+  // Optional status worker (Cloudflare)
+  const [statusWorkerUrl, setStatusWorkerUrl] = React.useState<string>("");
+
   // Help toggles
   const [ghHelp, setGhHelp] = React.useState(false);
   const [netlifyHelp, setNetlifyHelp] = React.useState(false);
@@ -60,6 +63,10 @@ export function DeployPanel() {
       setDefaultBranch(def);
       setCiBranch(def);
       setUserRepoBranch(def);
+
+      // Optional status worker URL
+      const sw = await loadDecrypted(nsKey(pid, "sec_status_worker_url"));
+      if (sw) setStatusWorkerUrl(sw);
 
       // Load UI prefs
       const hide = await loadDecrypted(nsKey(pid, "sec_hide_dist_banner"));
@@ -95,6 +102,7 @@ export function DeployPanel() {
   React.useEffect(() => { if (vercelOutDir) saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir); }, [vercelOutDir, pid]);
   React.useEffect(() => { if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo); }, [ghRepo, pid]);
   React.useEffect(() => { if (defaultBranch) saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch); }, [defaultBranch, pid]);
+  React.useEffect(() => { if (statusWorkerUrl) saveEncrypted(nsKey(pid, "sec_status_worker_url"), statusWorkerUrl); }, [statusWorkerUrl, pid]);
   // Persist UI prefs
   React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_gh"), ghHelp ? "1" : "0"); }, [ghHelp, pid]);
   React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_netlify"), netlifyHelp ? "1" : "0"); }, [netlifyHelp, pid]);
@@ -225,7 +233,37 @@ export function DeployPanel() {
         log(`Uploaded ${rel}`);
       }
     }
-    setStatus("Netlify deploy completed");
+    // 3) Poll deploy status
+    if (create.id) {
+      setStatus("Netlify deploy uploaded, polling status...");
+      const pollUrl = statusWorkerUrl ? `${statusWorkerUrl}/status/netlify?id=${encodeURIComponent(create.id)}` : `https://api.netlify.com/api/v1/deploys/${encodeURIComponent(create.id)}`;
+      const pollHeaders = statusWorkerUrl ? { Authorization: `Bearer ${netlifyToken}` } : { Authorization: `Bearer ${netlifyToken}` };
+      let attempts = 0;
+      const maxAttempts = 20;
+      const interval = 3000;
+      const timer = setInterval(async () => {
+        attempts++;
+        try {
+          const resp = await fetch(pollUrl, { headers: pollHeaders });
+          const data = await resp.json().catch(() => ({}));
+          const info = statusWorkerUrl ? data?.data : data;
+          const state = info?.state || info?.status;
+          log(`Netlify status: ${state || resp.status}`);
+          if (state === "ready" || state === "published") {
+            clearInterval(timer);
+            setStatus("Netlify deploy ready");
+          }
+          if (attempts >= maxAttempts) {
+            clearInterval(timer);
+            setStatus("Netlify polling timed out");
+          }
+        } catch {
+          // ignore transient
+        }
+      }, interval);
+    } else {
+      setStatus("Netlify deploy completed");
+    }
   };
 
   const deployVercel = async () => {
@@ -283,9 +321,41 @@ export function DeployPanel() {
         project: vercelProject,
       }),
     });
-    const depTxt = await depResp.text();
-    log(`Vercel deploy: ${depResp.status} ${depTxt.slice(0, 200)}`);
-    setStatus(depResp.ok ? "Vercel deployment request sent" : "Vercel deploy failed");
+    const depJson = await depResp.json().catch(() => ({}));
+    const depId = depJson?.id;
+    log(`Vercel deploy: ${depResp.status} id=${depId || "unknown"}`);
+    if (!depResp.ok) {
+      setStatus("Vercel deploy failed");
+      return;
+    }
+    setStatus("Vercel deployment request sent, polling status...");
+    if (depId) {
+      const pollUrl = statusWorkerUrl ? `${statusWorkerUrl}/status/vercel?id=${encodeURIComponent(depId)}` : `https://api.vercel.com/v13/deployments/${encodeURIComponent(depId)}`;
+      const pollHeaders = statusWorkerUrl ? { Authorization: `Bearer ${vercelToken}` } : { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" };
+      let attempts = 0;
+      const maxAttempts = 20;
+      const interval = 3000;
+      const timer = setInterval(async () => {
+        attempts++;
+        try {
+          const resp = await fetch(pollUrl, { headers: pollHeaders });
+          const data = await resp.json().catch(() => ({}));
+          const info = statusWorkerUrl ? data?.data : data;
+          const state = info?.readyState || info?.state;
+          log(`Vercel status: ${state || resp.status}`);
+          if (state === "READY" || state === "ready") {
+            clearInterval(timer);
+            setStatus("Vercel deploy ready");
+          }
+          if (attempts >= maxAttempts) {
+            clearInterval(timer);
+            setStatus("Vercel polling timed out");
+          }
+        } catch {
+          // ignore
+        }
+      }, interval);
+    }
   };
 
   return (
@@ -308,6 +378,16 @@ export function DeployPanel() {
               setUserRepoBranch(v);
             }}
             aria-label="Default branch"
+          />
+        </label>
+        <label className="text-xs flex items-center gap-1" title="Optional: Cloudflare Worker URL for status polling">
+          <span>Status Worker</span>
+          <input
+            className="h-7 rounded-md border border-input px-2 text-xs"
+            placeholder="https://your-deploy-status.workers.dev"
+            value={statusWorkerUrl}
+            onChange={(e) => setStatusWorkerUrl(e.currentTarget.value)}
+            aria-label="Status worker URL"
           />
         </label>
       </div>
