@@ -309,18 +309,17 @@ export function DeployPanel() {
                 <li>Generate a CI workflow below to build and publish dist/ automatically.</li>
               </ul>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-amber-100"
               onClick={() => {
                 setHideDistBanner(true);
                 saveEncrypted(nsKey(pid, "sec_hide_dist_banner"), "1");
               }}
-              aria-label="Don't show again"
-              title="Don't show again for this project"
+              aria-label="Dismiss and don't show again for this project"
+              title="Dismiss"
             >
-              Don’t show again
-            </Button>
+              ×
+            </button>
           </div>
         </div>
       )}
@@ -631,6 +630,28 @@ export function DeployPanel() {
               title="Clear all stored deploy credentials across all projects"
             >
               Clear All Stored Credentials
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                // Reset UI tips for this project
+                const keys = [
+                  nsKey(pid, "sec_hide_dist_banner"),
+                  nsKey(pid, "sec_help_gh"),
+                  nsKey(pid, "sec_help_netlify"),
+                  nsKey(pid, "sec_help_vercel"),
+                ];
+                keys.forEach((k) => localStorage.removeItem(k));
+                setHideDistBanner(false);
+                setGhHelp(false);
+                setNetlifyHelp(false);
+                setVercelHelp(false);
+                setStatus("Reset UI tips for this project");
+              }}
+              aria-label="Reset UI tips for this project"
+              title="Reset UI tips for this project"
+            >
+              Reset UI Tips (Project)
             </Button>
           </div>
           <div className="text-xs text-muted-foreground mt-2" title="How to use the workflows">
