@@ -26,7 +26,7 @@ type Command = {
 };
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { createFile, renameFile, deleteFile, snapshot, current, currentFilePath } = useProjectStore();
+  const { createFile, renameFile, deleteFile, snapshot, current, currentFilePath, upsertFile } = useProjectStore();
   const [query, setQuery] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -65,6 +65,22 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       run: async () => {
         if (!currentFilePath) return;
         if (confirm(`Delete ${currentFilePath}?`)) await deleteFile(currentFilePath);
+      },
+    },
+    {
+      id: "format-doc",
+      label: "Format Document",
+      run: async () => {
+        if (!current || !currentFilePath) return;
+        const f = current.files.find((x) => x.path === currentFilePath);
+        if (!f) return;
+        const [{ formatContentAsync }, { languageFromPath }] = await Promise.all([
+          import("../../lib/editor/format"),
+          import("../../lib/editor/lang"),
+        ]);
+        const lang = languageFromPath(currentFilePath);
+        const formatted = await formatContentAsync(lang, f.contents);
+        await upsertFile(currentFilePath, formatted);
       },
     },
     {
@@ -109,6 +125,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     { k: "F2", d: "Rename selected file (in Files)" },
     { k: "Delete/Backspace", d: "Delete selected file (in Files)" },
     { k: "Ctrl/Cmd+K", d: "Toggle command palette" },
+    { k: "↑/↓, Shift+↑/↓", d: "Navigate/extend selection (in Files)" },
   ];
 
   if (!open) return null;

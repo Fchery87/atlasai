@@ -134,7 +134,21 @@ export function FileTree() {
     clearSelection();
   };
 
+  const expandParents = (p: string) => {
+    const parts = p.split("/").filter(Boolean);
+    let cur = "";
+    const toOpen: Record<string, boolean> = {};
+    for (let i = 0; i < parts.length - 1; i++) {
+      cur = cur ? `${cur}/${parts[i]}` : parts[i];
+      toOpen[cur] = true;
+    }
+    setOpen((o) => ({ ...o, ...toOpen }));
+  };
+
   const selectWithModifiers = (e: React.MouseEvent, path: string) => {
+    // Always expand parents of the target to reveal selection
+    expandParents(path);
+
     if (e.shiftKey) {
       const list = flattenFiles(tree);
       const targetIdx = list.indexOf(path);
@@ -143,6 +157,8 @@ export function FileTree() {
       if (targetIdx !== -1 && anchorIdx !== -1) {
         const [start, end] = targetIdx > anchorIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
         const range = list.slice(start, end + 1);
+        // Expand parents along the whole range to reveal selected files
+        range.forEach((rp) => expandParents(rp));
         setSelected(new Set(range));
       }
     } else if (e.metaKey || e.ctrlKey) {
@@ -218,6 +234,8 @@ export function FileTree() {
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!currentFilePath) return;
+    const list = flattenFiles(tree);
+    const curIdx = list.indexOf(currentFilePath);
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
       onDelete(currentFilePath);
@@ -230,6 +248,28 @@ export function FileTree() {
     } else if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       selectFile(currentFilePath);
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (list.length === 0) return;
+      let nextIdx = curIdx;
+      if (e.key === "ArrowDown") nextIdx = Math.min(list.length - 1, curIdx + 1);
+      else nextIdx = Math.max(0, curIdx - 1);
+      const nextPath = list[nextIdx] ?? currentFilePath;
+      expandParents(nextPath);
+      selectFile(nextPath);
+      if (e.shiftKey) {
+        // extend selection from anchor to next
+        const start = anchor ? list.indexOf(anchor) : 0;
+        const [a, b] = nextIdx > start ? [start, nextIdx] : [nextIdx, start];
+        const range = list.slice(Math.max(0, a), Math.min(list.length - 1, b) + 1);
+        setSelected(new Set(range));
+      } else if (e.metaKey || e.ctrlKey) {
+        // toggle only, don't change anchor
+        toggleSelect(nextPath);
+      } else {
+        setSelected(new Set([nextPath]));
+        setAnchor(nextPath);
+      }
     }
   };
 
