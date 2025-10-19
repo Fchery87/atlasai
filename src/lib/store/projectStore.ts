@@ -19,6 +19,7 @@ type State = {
 
   currentFilePath?: string;
   staged?: StagedDiff;
+  lastApplied?: StagedDiff;
   fileLock: boolean;
   previewHtml?: string;
 };
@@ -37,6 +38,7 @@ type Actions = {
   restoreSnapshot: (id: string) => Promise<void>;
   stageDiff: (path: string, after?: string) => void;
   approveDiff: () => Promise<void>;
+  undoLastApply: () => Promise<void>;
   rejectDiff: () => void;
   exportZip: () => Promise<Blob>;
   importZip: (file: File) => Promise<Project>;
@@ -242,10 +244,27 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       } else {
         await get().upsertFile(state.staged.path, state.staged.after);
       }
-      set({ staged: undefined });
+      set({ lastApplied: state.staged, staged: undefined });
     } finally {
       set({ fileLock: false });
     }
+  },
+
+  async undoLastApply() {
+    const state = get();
+    if (!state.current || !state.lastApplied) return;
+    const la = state.lastApplied;
+    if (la.op === "delete") {
+      // bring file back with before content
+      await get().upsertFile(la.path, la.before);
+    } else if (la.op === "add") {
+      // file was added; delete it
+      await get().deleteFile(la.path);
+    } else {
+      // modify: restore before
+      await get().upsertFile(la.path, la.before);
+    }
+    set({ lastApplied: undefined });
   },
 
   rejectDiff() {

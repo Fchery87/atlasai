@@ -98,7 +98,103 @@ const spaRouter: Template = {
   ],
 };
 
-const templates: Template[] = [vanillaHtml, spaRouter];
+const tailwindCdn: Template = {
+  id: "vanilla-tailwind",
+  name: "Vanilla + Tailwind (CDN)",
+  description: "Zero-build Tailwind via CDN with a simple UI.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Tailwind CDN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="p-6 font-sans">
+    <h1 class="text-2xl font-bold mb-2">Tailwind via CDN</h1>
+    <p class="text-slate-600 mb-4">Start styling immediately without a build step.</p>
+    <button class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700" onclick="toggle()">Toggle Panel</button>
+    <div id="panel" class="mt-4 p-3 rounded border border-slate-200">This is a panel.</div>
+    <script>
+      function toggle(){
+        const el = document.getElementById("panel");
+        el.classList.toggle("hidden");
+      }
+    </script>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const mdStatic: Template = {
+  id: "markdown-static",
+  name: "Markdown → HTML (static)",
+  description: "Simple client-side Markdown-to-HTML site.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Markdown Site</title>
+    <style>
+      body{font-family:system-ui,sans-serif;padding:1rem;max-width:720px;margin:auto}
+      pre{background:#f6f8fa;padding:.75rem;border-radius:.375rem;overflow:auto}
+      code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+      nav a{margin-right:.5rem}
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="#/README.md">README</a>
+      <a href="#/ABOUT.md">About</a>
+    </nav>
+    <main id="app">Loading...</main>
+    <script>
+      async function load(path){
+        try {
+          const res = await fetch(path);
+          const text = await res.text();
+          document.getElementById("app").innerHTML = mdToHtml(text);
+        } catch(e) {
+          document.getElementById("app").textContent = "Failed to load " + path;
+        }
+      }
+      function mdToHtml(md){
+        // extremely small markdown renderer (headings, paragraphs, code fences)
+        const fence = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
+        md = md.replace(fence, (_, lang, code) => '<pre><code>' + escapeHtml(code) + '</code></pre>');
+        md = md.replace(/^###\\s+(.*)$/gm, '<h3>$1</h3>');
+        md = md.replace(/^##\\s+(.*)$/gm, '<h2>$1</h2>');
+        md = md.replace(/^#\\s+(.*)$/gm, '<h1>$1</h1>');
+        md = md.replace(/^\\s*\\n/gm, '<br/>');
+        md = md.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+        md = md.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
+        // paragraphs: wrap lines not already HTML blocks
+        md = md.split(/\\n\\n+/).map(block => /<h\\d|<pre|<ul|<ol|<br/.test(block) ? block : '<p>' + block + '</p>').join('\\n');
+        return md;
+      }
+      function escapeHtml(s){return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+      function route(){
+        const hash = location.hash.slice(2) || "README.md";
+        load(hash);
+      }
+      window.addEventListener("hashchange", route);
+      route();
+    </script>
+  </body>
+</html>`,
+    },
+    { path: "README.md", contents: "# Welcome\\n\\nThis is a simple Markdown site.\\n\\n```js\\nconsole.log('hello');\\n```" },
+    { path: "ABOUT.md", contents: "## About\\n\\nThis page is rendered from Markdown on the client." },
+  ],
+};
+
+const templates: Template[] = [vanillaHtml, spaRouter, tailwindCdn, mdStatic];
 
 export function TemplatesGallery() {
   const { createProject, upsertFile } = useProjectStore();

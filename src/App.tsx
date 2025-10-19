@@ -59,7 +59,7 @@ function Header() {
 }
 
 function EditorPanel() {
-  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock } = useProjectStore();
+  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock, lastApplied, undoLastApply } = useProjectStore();
   const file = current?.files.find((f) => f.path === currentFilePath);
   const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
   const debouncedCode = useDebounced(code, 150);
@@ -153,6 +153,9 @@ function EditorPanel() {
               <Button onClick={approveDiff} disabled={fileLock} title="Approve (Shift+Ctrl/Cmd+Enter)">Approve</Button>
               <Button variant="ghost" onClick={rejectDiff} title="Reject (Esc)">Reject</Button>
             </>
+          )}
+          {!staged && lastApplied && (
+            <Button variant="ghost" onClick={undoLastApply} title="Undo last apply">Undo last apply</Button>
           )}
         </div>
       </CardHeader>
@@ -315,10 +318,13 @@ function ChatPanel() {
     return msgs;
   };
 
+  const stopRef = React.useRef<boolean>(false);
+
   const send = async () => {
     const bundle = registry[providerId];
     if (!bundle) return;
     setStreaming(true);
+    stopRef.current = false;
     setOutput("");
     setStatus("Starting...");
     let key = "";
@@ -338,13 +344,17 @@ function ChatPanel() {
         messages: buildMessages(),
       };
       for await (const chunk of bundle.adapter.stream(bundle.def, key, payload)) {
+        if (stopRef.current) {
+          setStatus("Stopped");
+          break;
+        }
         if (chunk.type === "text") {
           setOutput((prev) => prev + chunk.data);
         } else {
           setStatus(chunk.data);
         }
       }
-      setStatus("Done");
+      if (!stopRef.current) setStatus("Done");
     } catch (e: any) {
       setStatus(e?.message ?? "Stream failed");
     } finally {
@@ -484,9 +494,22 @@ function ChatPanel() {
               value={prompt}
               onChange={(e) => setPrompt(e.currentTarget.value)}
             />
-            <Button onClick={send} disabled={!prompt.trim() || streaming} aria-label="Send">
-              {streaming ? "Streaming..." : "Send"}
-            </Button>
+            {!streaming ? (
+              <Button onClick={send} disabled={!prompt.trim()} aria-label="Send">
+                Send
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  stopRef.current = true;
+                }}
+                aria-label="Stop"
+                title="Stop streaming"
+              >
+                Stop
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <input
