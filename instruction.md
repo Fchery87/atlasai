@@ -45,10 +45,16 @@ Cloudflare Workers (optional):
 
 2) Initialize Husky precommit hooks (optional, recommended)
 - npm run prepare
-  - This installs Husky and sets up the `.husky/pre-commit` hook to run lint-staged.
+  - This runs Husky setup and enables the `.husky/pre-commit` hook to run lint-staged.
 
 3) Install Playwright browsers for E2E tests (optional)
 - npx playwright install --with-deps
+
+4) (Optional) Run security checks locally
+- npm run security
+  - Runs `npm audit` and OSV scanner over the repo
+- npm run security:fix
+  - Attempts to fix issues automatically (non-force). Review changes before committing.
 
 ## Development
 
