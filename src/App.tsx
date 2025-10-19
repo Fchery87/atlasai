@@ -86,6 +86,7 @@ function EditorPanel() {
   };
 
   // Keyboard shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Enter stage, Shift+Cmd/Ctrl+Enter approve, Escape reject
+  // Undo/Redo: Cmd/Ctrl+Z (undo), Shift+Cmd/Ctrl+Z (redo)
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
@@ -96,20 +97,29 @@ function EditorPanel() {
         }
         return;
       }
-      if (e.key.toLowerCase() === "s") {
+      const k = e.key.toLowerCase();
+      if (k === "s") {
         e.preventDefault();
         onSave();
-      } else if (e.key === "Enter" && e.shiftKey) {
+      } else if (k === "enter" && e.shiftKey) {
         e.preventDefault();
         if (staged && !fileLock) approveDiff();
-      } else if (e.key === "Enter") {
+      } else if (k === "enter") {
         e.preventDefault();
         onStage();
+      } else if (k === "z" && e.shiftKey) {
+        e.preventDefault();
+        // redo
+        redoLastApply();
+      } else if (k === "z") {
+        e.preventDefault();
+        // undo
+        undoLastApply();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath, formatOnSave, lang]);
+  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath, formatOnSave, lang, undoLastApply, redoLastApply]);
 
   React.useEffect(() => {
     localStorage.setItem("bf_format_on_save", formatOnSave ? "1" : "0");

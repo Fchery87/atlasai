@@ -12,6 +12,7 @@ import { GPT5Def, GPT5Adapter } from "../../lib/providers/gpt5";
 import { GenericOpenAIAdapter } from "../../lib/providers/generic";
 import { loadProviderKey, saveProviderKey, clearProviderKey } from "../../lib/crypto/keys";
 import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
+import { z } from "zod";
 
 type ProviderEntry = {
   def: ProviderDefinition;
@@ -127,15 +128,58 @@ export function ProviderManager() {
     keyName: string;
     models: string;
   }>({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+  const [headers, setHeaders] = React.useState<Array<{ key: string; value: string }>>([]);
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+
+  const CustomDefSchema = z.object({
+    id: z.string().min(1, "ID is required"),
+    name: z.string().min(1, "Name is required"),
+    baseUrl: z.string().url("Base URL must be a valid URL"),
+    authType: z.enum(["apiKey", "bearer", "none"]),
+    keyName: z.string().optional(),
+    models: z.string().min(1, "At least one model ID is required"),
+    headers: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
+  });
+
+  const addHeaderRow = () => setHeaders((rows) => [...rows, { key: "", value: "" }]);
+  const removeHeaderRow = (idx: number) => setHeaders((rows) => rows.filter((_, i) => i !== idx));
+  const updateHeaderRow = (idx: number, field: "key" | "value", val: string) =>
+    setHeaders((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)));
 
   const addCustomProvider = () => {
+    // zod validate
+    const parsed = CustomDefSchema.safeParse({
+      ...newProv,
+      headers,
+    });
+    if (!parsed.success) {
+      const errs: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const path = issue.path[0] as string;
+        errs[path] = issue.message;
+      }
+      setErrors(errs);
+      return;
+    }
+    setErrors({});
     const id = newProv.id.trim() || newProv.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const headerObj = headers.reduce<Record<string, string>>((acc, h) => {
+      if (h.key.trim()) acc[h.key.trim()] = h.value;
+      return acc;
+    }, {});
+    const modelList = newProv.models
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((id) => ({ id }));
+
     const def: ProviderDefinition = {
       id,
       name: newProv.name || id,
       baseUrl: newProv.baseUrl.trim(),
       auth: { type: newProv.authType, keyName: newProv.keyName || undefined } as any,
-      models: newProv.models.split(",").map((s) => ({ id: s.trim() })).filter((m) => m.id),
+      headers: Object.keys(headerObj).length ? headerObj : undefined,
+      models: modelList,
     };
     // Persist to localStorage
     const existingRaw = localStorage.getItem("bf_custom_providers");
@@ -149,6 +193,7 @@ export function ProviderManager() {
     setProviders((prev) => [...prev, { def, key: "", status: "unknown" }]);
     // Reset form
     setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+    setHeaders([]);
   };
 
   return (
@@ -223,9 +268,18 @@ export function ProviderManager() {
       <div className="rounded-md border p-3 space-y-2">
         <div className="font-medium">Add Custom Provider (OpenAI-compatible)</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Input aria-label="Provider ID" placeholder="id (slug)" value={newProv.id} onChange={(e) => setNewProv(v => ({ ...v, id: e.currentTarget.value }))} />
-          <Input aria-label="Provider Name" placeholder="Display name" value={newProv.name} onChange={(e) => setNewProv(v => ({ ...v, name: e.currentTarget.value }))} />
-          <Input aria-label="Base URL" placeholder="https://api.example.com/v1" value={newProv.baseUrl} onChange={(e) => setNewProv(v => ({ ...v, baseUrl: e.currentTarget.value }))} />
+          <div>
+            <Input aria-label="Provider ID" placeholder="id (slug)" value={newProv.id} onChange={(e) => setNewProv(v => ({ ...v, id: e.currentTarget.value }))} />
+            {errors.id && <div className="text-xs text-red-600 mt-1">{errors.id}</div>}
+          </div>
+          <div>
+            <Input aria-label="Provider Name" placeholder="Display name" value={newProv.name} onChange={(e) => setNewProv(v => ({ ...v, name: e.currentTarget.value }))} />
+            {errors.name && <div className="text-xs text-red-600 mt-1">{errors.name}</div>}
+          </div>
+          <div>
+            <Input aria-label="Base URL" placeholder="https://api.example.com/v1" value={newProv.baseUrl} onChange={(e) => setNewProv(v => ({ ...v, baseUrl: e.currentTarget.value }))} />
+            {errors.baseUrl && <div className="text-xs text-red-600 mt-1">{errors.baseUrl}</div>}
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <label className="text-xs">
@@ -241,9 +295,29 @@ export function ProviderManager() {
               <option value="none">none</option>
             </select>
           </label>
-          <Input aria-label="Auth header" placeholder="Header key (e.g., Authorization or x-api-key)" value={newProv.keyName} onChange={(e) => setNewProv(v => ({ ...v, keyName: e.currentTarget.value }))} />
-          <Input aria-label="Models" placeholder="model-a,model-b" value={newProv.models} onChange={(e) => setNewProv(v => ({ ...v, models: e.currentTarget.value }))} />
+          <div>
+            <Input aria-label="Auth header" placeholder="Header key (e.g., Authorization or x-api-key)" value={newProv.keyName} onChange={(e) => setNewProv(v => ({ ...v, keyName: e.currentTarget.value }))} />
+          </div>
+          <div>
+            <Input aria-label="Models" placeholder="model-a,model-b" value={newProv.models} onChange={(e) => setNewProv(v => ({ ...v, models: e.currentTarget.value }))} />
+            {errors.models && <div className="text-xs text-red-600 mt-1">{errors.models}</div>}
+          </div>
         </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Custom headers</div>
+          <div className="space-y-2">
+            {headers.map((h, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input aria-label={`Header key ${idx+1}`} placeholder="Header key" value={h.key} onChange={(e) => updateHeaderRow(idx, "key", e.currentTarget.value)} />
+                <Input aria-label={`Header value ${idx+1}`} placeholder="Header value" value={h.value} onChange={(e) => updateHeaderRow(idx, "value", e.currentTarget.value)} />
+                <Button variant="ghost" size="sm" aria-label="Remove header" title="Remove" onClick={() => removeHeaderRow(idx)}>Remove</Button>
+              </div>
+            ))}
+          </div>
+          <Button variant="ghost" size="sm" aria-label="Add header" onClick={addHeaderRow}>Add header</Button>
+        </div>
+
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
