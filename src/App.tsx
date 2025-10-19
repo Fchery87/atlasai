@@ -46,8 +46,8 @@ function EditorPanel() {
     if (!currentFilePath) return;
     let output = debouncedCode;
     if (formatOnSave) {
-      const { formatContent } = await import("./lib/editor/format");
-      output = formatContent(lang, output);
+      const { formatContentAsync } = await import("./lib/editor/format");
+      output = await formatContentAsync(lang, output);
       setCode(output);
     }
     await upsertFile(currentFilePath, output);

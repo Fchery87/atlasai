@@ -25,7 +25,7 @@ function summarizeDiff(current: { path: string; contents: string }[], snap: { pa
 }
 
 export function SnapshotList() {
-  const { current, restoreSnapshot } = useProjectStore();
+  const { current, restoreSnapshot, stageDiff } = useProjectStore();
   const snaps = current?.snapshots ?? [];
   const [previewId, setPreviewId] = React.useState<string | null>(null);
 
@@ -41,6 +41,16 @@ export function SnapshotList() {
     selected && current
       ? summarizeDiff(current.files, selected.files)
       : null;
+
+  const openFileDiff = (path: string) => {
+    if (!current || !selected) return;
+    const before = current.files.find((f) => f.path === path)?.contents ?? "";
+    const after = selected.files.find((f) => f.path === path)?.contents ?? "";
+    // Only stage diffs for files that exist in snapshot (added or modified)
+    if (after !== undefined) {
+      stageDiff(path, after);
+    }
+  };
 
   return (
     <div className="text-sm">
@@ -68,16 +78,38 @@ export function SnapshotList() {
                 </li>
               ))}
           </ul>
-          {summary && (
+          {summary && selected && current && (
             <div className="mt-3 rounded-md border p-2">
               <div className="font-medium mb-1">Changes</div>
               <div className="text-xs">
                 <div>Added ({summary.added.length})</div>
-                <ul className="mb-2">{summary.added.map((p) => <li key={"a-"+p}>{p}</li>)}</ul>
+                <ul className="mb-2">
+                  {summary.added.map((p) => (
+                    <li key={"a-" + p}>
+                      <button className="underline hover:no-underline" onClick={() => openFileDiff(p)} aria-label={`Diff ${p}`}>
+                        {p}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
                 <div>Removed ({summary.removed.length})</div>
-                <ul className="mb-2">{summary.removed.map((p) => <li key={"r-"+p}>{p}</li>)}</ul>
+                <ul className="mb-2">
+                  {summary.removed.map((p) => (
+                    <li key={"r-" + p} className="text-muted-foreground">
+                      {p} (cannot preview delete)
+                    </li>
+                  ))}
+                </ul>
                 <div>Modified ({summary.modified.length})</div>
-                <ul className="mb-2">{summary.modified.map((p) => <li key={"m-"+p}>{p}</li>)}</ul>
+                <ul className="mb-2">
+                  {summary.modified.map((p) => (
+                    <li key={"m-" + p}>
+                      <button className="underline hover:no-underline" onClick={() => openFileDiff(p)} aria-label={`Diff ${p}`}>
+                        {p}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           )}

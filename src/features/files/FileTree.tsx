@@ -8,12 +8,23 @@ export function FileTree() {
   const [renaming, setRenaming] = React.useState<string | null>(null);
   const renameInputRef = React.useRef<HTMLInputElement>(null);
 
+  const [creating, setCreating] = React.useState<boolean>(false);
+  const [createValue, setCreateValue] = React.useState<string>("");
+  const createInputRef = React.useRef<HTMLInputElement>(null);
+
   React.useEffect(() => {
     if (renaming) {
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
     }
   }, [renaming]);
+
+  React.useEffect(() => {
+    if (creating) {
+      createInputRef.current?.focus();
+      createInputRef.current?.select();
+    }
+  }, [creating]);
 
   const onDelete = async (path: string) => {
     if (confirm(`Delete ${path}?`)) {
@@ -26,9 +37,16 @@ export function FileTree() {
     await snapshot(label);
   };
 
-  const onCreate = async () => {
-    const path = prompt("New file path (e.g., index.html)");
-    if (!path) return;
+  const startCreate = (prefill = "") => {
+    setCreateValue(prefill);
+    setCreating(true);
+  };
+
+  const applyCreate = async () => {
+    const raw = createValue.trim();
+    setCreating(false);
+    if (!raw) return;
+    const path = raw.endsWith("/") ? raw + "untitled.txt" : raw;
     try {
       await createFile(path);
     } catch (e: any) {
@@ -59,7 +77,7 @@ export function FileTree() {
       startRename(currentFilePath);
     } else if ((e.key.toLowerCase() === "n") && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      onCreate();
+      startCreate();
     } else if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       selectFile(currentFilePath);
@@ -71,11 +89,30 @@ export function FileTree() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">Files</div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={onCreate} aria-label="Create file">New</Button>
+          <Button size="sm" variant="secondary" onClick={() => startCreate()} aria-label="Create file">New</Button>
+          <Button size="sm" variant="secondary" onClick={() => startCreate("folder/")} aria-label="Create folder">New Folder</Button>
           <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot">Snapshot</Button>
         </div>
       </div>
       <ul className="space-y-1">
+        {creating && (
+          <li className="flex items-center gap-2">
+            <input
+              ref={createInputRef}
+              value={createValue}
+              onChange={(e) => setCreateValue(e.currentTarget.value)}
+              onBlur={applyCreate}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyCreate();
+                if (e.key === "Escape") setCreating(false);
+              }}
+              placeholder="path/to/file.ext or folder/"
+              className="flex-1 h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label="New file path"
+            />
+            <Button size="sm" onClick={applyCreate}>Add</Button>
+          </li>
+        )}
         {files.map((f) => (
           <li key={f.path} className="flex items-center justify-between gap-2">
             {renaming === f.path ? (
@@ -109,7 +146,7 @@ export function FileTree() {
             </div>
           </li>
         ))}
-        {files.length === 0 && <li className="text-muted-foreground">No files yet</li>}
+        {files.length === 0 && !creating && <li className="text-muted-foreground">No files yet</li>}
       </ul>
     </div>
   );
