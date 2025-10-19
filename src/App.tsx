@@ -142,6 +142,11 @@ function DiffPanel() {
         <CardTitle>Diff — {staged.path} ({titleOp})</CardTitle>
       </CardHeader>
       <CardContent className="p-0 grow min-h-[200px]">
+        {staged.op === "delete" && (
+          <div className="px-3 py-2 text-xs bg-amber-50 text-amber-900 border-b border-amber-200">
+            This is a delete preview. Approving will remove the file from the project.
+          </div>
+        )}
         <DiffEditor
           height="100%"
           original={staged.before}

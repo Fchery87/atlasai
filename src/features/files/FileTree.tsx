@@ -27,7 +27,9 @@ function buildTree(paths: string[]): Node[] {
       const val = obj[key];
       const full = basePath ? `${basePath}/${key}` : key;
       if (val && val.__file) {
-        files.push({ type: "file", name: key, path: full });
+        if (key !== ".keep") {
+          files.push({ type: "file", name: key, path: full });
+        }
       } else {
         folders.push({ type: "folder", name: key, path: full, children: toNodes(val, full) });
       }
@@ -89,6 +91,37 @@ export function FileTree() {
   });
 
   const [q, setQ] = React.useState("");
+
+  // Multi-select
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const toggleSelect = (path: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+  const selectAll = () => {
+    const all: string[] = [];
+    const collect = (nodes: Node[]) => {
+      nodes.forEach((n) => {
+        if (n.type === "file") all.push(n.path);
+        else collect(n.children);
+      });
+    };
+    collect(tree);
+    setSelected(new Set(all));
+  };
+  const deleteSelected = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected file(s)?`)) return;
+    for (const p of Array.from(selected)) {
+      await deleteFile(p);
+    }
+    clearSelection();
+  };
 
   React.useEffect(() => {
     localStorage.setItem("bf_tree_open", JSON.stringify(open));
@@ -200,6 +233,13 @@ export function FileTree() {
     if (node.type === "file") {
       return (
         <li key={node.path} className="flex items-center justify-between gap-2">
+          <input
+            type="checkbox"
+            aria-label={`Select ${node.path}`}
+            checked={selected.has(node.path)}
+            onChange={() => toggleSelect(node.path)}
+            className="h-4 w-4"
+          />
           {renaming === node.path ? (
             <input
               ref={renameInputRef}
@@ -291,9 +331,36 @@ export function FileTree() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">Files</div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => startCreate("", "")} aria-label="Create file" title="New (Ctrl/Cmd+N)">New</Button>
-          <Button size="sm" variant="secondary" onClick={() => startCreate("folder/", "")} aria-label="Create folder" title="New Folder">New Folder</Button>
-          <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot" title="Create Snapshot">Snapshot</Button>
+          {selected.size > 0 ? (
+            <>
+              <Button size="sm" variant="destructive" onClick={deleteSelected} aria-label="Delete selected" title="Delete selected">Delete Selected</Button>
+              <Button size="sm" variant="secondary" onClick={clearSelection} aria-label="Clear selection" title="Clear selection">Clear</Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => startCreate("", "")} aria-label="Create file" title="New (Ctrl/Cmd+N)">New</Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  const name = prompt("New folder name");
+                  if (!name) return;
+                  const path = name.replace(/\/+$/g, "");
+                  try {
+                    await createFile((path ? path : "folder") + "/.keep");
+                  } catch (e: any) {
+                    alert(e?.message ?? "Failed to create folder");
+                  }
+                }}
+                aria-label="Create folder"
+                title="New Folder"
+              >
+                New Folder
+              </Button>
+              <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot" title="Create Snapshot">Snapshot</Button>
+              <Button size="sm" variant="ghost" onClick={selectAll} aria-label="Select all" title="Select all">Select All</Button>
+            </>
+          )}
         </div>
       </div>
       <div className="mb-2">
