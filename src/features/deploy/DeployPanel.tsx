@@ -298,49 +298,16 @@ export function DeployPanel() {
             <Button
               variant="ghost"
               onClick={() => {
-                const content = `name: Build and Deploy to GitHub Pages
-on:
-  push:
-    branches: [ ${ciBranch || "main"} ]
-  workflow_dispatch:
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-`;
-                const blob = new Blob([content], { type: "text/yaml" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "gh-pages.yml";
-                a.click();
-                URL.revokeObjectURL(url);
+                import("../../lib/deploy/workflows").then(({ generateGhPagesWorkflow }) => {
+                  const content = generateGhPagesWorkflow(ciBranch);
+                  const blob = new Blob([content], { type: "text/yaml" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "gh-pages.yml";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                });
               }}
               aria-label="Download GitHub Pages workflow"
               title="Download GitHub Pages workflow (add to .github/workflows)"
@@ -436,34 +403,16 @@ jobs:
             <Button
               variant="ghost"
               onClick={() => {
-                const content = `name: Build and Deploy (User Repo)
-on:
-  push:
-    branches: [ ${userRepoBranch || "main"} ]
-  workflow_dispatch:
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-`;
-                const blob = new Blob([content], { type: "text/yaml" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "user-gh-pages.yml";
-                a.click();
-                URL.revokeObjectURL(url);
+                import("../../lib/deploy/workflows").then(({ generateUserGhPagesWorkflow }) => {
+                  const content = generateUserGhPagesWorkflow(userRepoBranch);
+                  const blob = new Blob([content], { type: "text/yaml" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "user-gh-pages.yml";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                });
               }}
               aria-label="Download user GH Pages workflow"
               title="Download user GH Pages workflow (add to .github/workflows)"
@@ -548,26 +497,3 @@ jobs:
       </div>
     </div>
   );
-}}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-`;
-              const blob = new Blob([content], { type: "text/yaml" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "gh-pages.yml";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            aria-label="Download GitHub Pages workflow"
-            title="Download GitHub Pages workflow"
-          >
-            Download GH Pages Workflow
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}

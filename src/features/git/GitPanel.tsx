@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
 import { startGitHubOAuth, completeGitHubOAuth, getGitHubToken, clearGitHubToken, saveGitHubClientConfig, loadGitHubClientConfig } from "../../lib/oauth/github";
+import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
@@ -20,20 +21,25 @@ export function GitPanel() {
   const [repoUrl, setRepoUrl] = React.useState("");
   const [branch, setBranch] = React.useState("main");
   const [status, setStatus] = React.useState("Idle");
+  const pid = useProjectStore().current?.id;
   const [ghClientId, setGhClientId] = React.useState<string>("");
   const [workerUrl, setWorkerUrl] = React.useState<string>("");
   const [token, setToken] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    // Load encrypted config and token
+    // Load encrypted config, token, and default branch for this project
     (async () => {
       const cfg = await loadGitHubClientConfig();
       if (cfg.clientId) setGhClientId(cfg.clientId);
       if (cfg.workerUrl) setWorkerUrl(cfg.workerUrl);
       const t = await getGitHubToken();
       setToken(t);
+      const defBranch = (await loadDecrypted(pid ? `sec_default_branch:${pid}` : "sec_default_branch")) || "main";
+      setBranch(defBranch);
+      const savedBranch = (await loadDecrypted(pid ? `sec_git_branch:${pid}` : "sec_git_branch")) || undefined;
+      if (savedBranch) setBranch(savedBranch);
     })();
-  }, []);
+  }, [pid]);
 
   React.useEffect(() => {
     // Persist config encrypted
@@ -213,7 +219,12 @@ export function GitPanel() {
           placeholder="branch"
           aria-label="Branch"
           value={branch}
-          onChange={(e) => setBranch(e.currentTarget.value)}
+          onChange={(e) => {
+            const v = e.currentTarget.value;
+            setBranch(v);
+            if (v) saveEncrypted(pid ? `sec_git_branch:${pid}` : "sec_git_branch", v);
+          }}
+          title="Defaulted from project default branch"
         />
         <Button variant="secondary" onClick={pushRepo} aria-label="Push changes">Push</Button>
       </div>
