@@ -135,16 +135,17 @@ function DiffPanel() {
       </Card>
     );
   }
+  const titleOp = staged.op === "delete" ? "Delete" : staged.op === "add" ? "Add" : "Modify";
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
-        <CardTitle>Diff — {staged.path}</CardTitle>
+        <CardTitle>Diff — {staged.path} ({titleOp})</CardTitle>
       </CardHeader>
       <CardContent className="p-0 grow min-h-[200px]">
         <DiffEditor
           height="100%"
           original={staged.before}
-          modified={staged.after}
+          modified={staged.op === "delete" ? "" : staged.after}
           options={{ readOnly: true, renderSideBySide: true, renderIndicators: true, fontSize: 13, minimap: { enabled: false } }}
         />
       </CardContent>
@@ -308,8 +309,10 @@ import { FileTree } from "./features/files/FileTree";
 import { SearchBar } from "./features/search/SearchBar";
 import { useTerminalStore } from "./lib/store/terminalStore";
 import { SnapshotList } from "./features/snapshots/SnapshotList";
+import { CommandPalette, useCommandPalette } from "./features/commands/CommandPalette";
 
 export default function App() {
+  const { open, setOpen } = useCommandPalette();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
@@ -350,6 +353,7 @@ export default function App() {
           </div>
         </section>
       </main>
+      <CommandPalette open={open} onClose={() => setOpen(false)} />
     </div>
   );
 }

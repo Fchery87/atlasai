@@ -8,6 +8,7 @@ type StagedDiff = {
   path: string;
   before: string;
   after: string;
+  op: "add" | "modify" | "delete";
 };
 
 type State = {
@@ -223,8 +224,10 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
   stageDiff(path, after) {
     const state = get();
     if (!state.current) throw new Error("No project open");
-    const before = state.current.files.find((f) => f.path === path)?.contents ?? "";
-    set({ staged: { path, before, after } });
+    const existing = state.current.files.find((f) => f.path === path);
+    const before = existing?.contents ?? "";
+    const op: "add" | "modify" | "delete" = after === undefined ? (existing ? "delete" : "add") : existing ? "modify" : "add";
+    set({ staged: { path, before, after: after ?? "", op } });
   },
 
   async approveDiff() {
@@ -234,7 +237,11 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     if (state.fileLock) throw new Error("File lock engaged");
     set({ fileLock: true });
     try {
-      await get().upsertFile(state.staged.path, state.staged.after);
+      if (state.staged.op === "delete") {
+        await get().deleteFile(state.staged.path);
+      } else {
+        await get().upsertFile(state.staged.path, state.staged.after);
+      }
       set({ staged: undefined });
     } finally {
       set({ fileLock: false });
