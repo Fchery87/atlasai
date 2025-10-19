@@ -15,7 +15,11 @@ export function languageFromPath(path?: string): string | undefined {
     case "html":
       return "html";
     case "md":
+    case "markdown":
       return "markdown";
+    case "yml":
+    case "yaml":
+      return "yaml";
     case "sh":
     case "bash":
       return "shell";

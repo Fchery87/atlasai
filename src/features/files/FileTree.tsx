@@ -94,6 +94,20 @@ export function FileTree() {
 
   // Multi-select
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [anchor, setAnchor] = React.useState<string | null>(null);
+
+  const flattenFiles = React.useCallback((nodes: Node[]): string[] => {
+    const out: string[] = [];
+    const walk = (ns: Node[]) => {
+      ns.forEach((n) => {
+        if (n.type === "file") out.push(n.path);
+        else walk(n.children);
+      });
+    };
+    walk(nodes);
+    return out;
+  }, []);
+
   const toggleSelect = (path: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -102,17 +116,14 @@ export function FileTree() {
       return next;
     });
   };
-  const clearSelection = () => setSelected(new Set());
+  const clearSelection = () => {
+    setSelected(new Set());
+    setAnchor(null);
+  };
   const selectAll = () => {
-    const all: string[] = [];
-    const collect = (nodes: Node[]) => {
-      nodes.forEach((n) => {
-        if (n.type === "file") all.push(n.path);
-        else collect(n.children);
-      });
-    };
-    collect(tree);
+    const all = flattenFiles(tree);
     setSelected(new Set(all));
+    setAnchor(all.length ? all[0] : null);
   };
   const deleteSelected = async () => {
     if (selected.size === 0) return;
@@ -121,6 +132,26 @@ export function FileTree() {
       await deleteFile(p);
     }
     clearSelection();
+  };
+
+  const selectWithModifiers = (e: React.MouseEvent, path: string) => {
+    if (e.shiftKey) {
+      const list = flattenFiles(tree);
+      const targetIdx = list.indexOf(path);
+      const anchorPath = anchor ?? list[0];
+      const anchorIdx = list.indexOf(anchorPath);
+      if (targetIdx !== -1 && anchorIdx !== -1) {
+        const [start, end] = targetIdx > anchorIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+        const range = list.slice(start, end + 1);
+        setSelected(new Set(range));
+      }
+    } else if (e.metaKey || e.ctrlKey) {
+      toggleSelect(path);
+      if (!anchor) setAnchor(path);
+    } else {
+      setSelected(new Set([path]));
+      setAnchor(path);
+    }
   };
 
   React.useEffect(() => {
@@ -254,7 +285,10 @@ export function FileTree() {
             />
           ) : (
             <button
-              onClick={() => selectFile(node.path)}
+              onClick={(e) => {
+                selectWithModifiers(e, node.path);
+                selectFile(node.path);
+              }}
               className={`text-left flex-1 rounded px-2 py-1 hover:bg-muted ${currentFilePath === node.path ? "bg-muted" : ""}`}
               aria-label={`Open ${node.path}`}
               title="Open"
@@ -288,7 +322,8 @@ export function FileTree() {
             aria-label={`Toggle ${node.name}`}
             title={isOpen ? "Collapse" : "Expand"}
           >
-            {isOpen ? "📂" : "📁"} {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}
+            {isOpen ? "📂" : "📁"} {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}{" "}
+            {node.children.length === 0 && <span className="text-xs text-muted-foreground">(empty)</span>}
           </button>
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" aria-label={`New in ${node.path}`} onClick={() => startCreate(node.path + "/", node.path)} title="New here">
@@ -405,7 +440,7 @@ export function FileTree() {
           <button
             className="block w-full text-left px-3 py-2 hover:bg-muted"
             onClick={() => {
-              startCreate(menu.path + "/");
+              startCreate(menu.path + "/", menu.path);
               setMenu(null);
             }}
           >
@@ -414,11 +449,31 @@ export function FileTree() {
           <button
             className="block w-full text-left px-3 py-2 hover:bg-muted"
             onClick={() => {
-              startCreate(menu.path + "/");
+              startCreate(menu.path + "/", menu.path);
               setMenu(null);
             }}
           >
             New folder here
+          </button>
+          <button
+            className="block w-full text-left px-3 py-2 hover:bg-muted text-red-600"
+            onClick={async () => {
+              // Delete folder if empty (.keep allowed)
+              const hasNonKeep = (current?.files ?? []).some((f) => f.path.startsWith(menu.path + "/") && !f.path.endsWith("/.keep"));
+              if (hasNonKeep) {
+                alert("Folder is not empty.");
+              } else {
+                const keepPath = menu.path + "/.keep";
+                if ((current?.files ?? []).some((f) => f.path === keepPath)) {
+                  await deleteFile(keepPath);
+                } else {
+                  alert("Folder is already empty.");
+                }
+              }
+              setMenu(null);
+            }}
+          >
+            Delete folder (if empty)
           </button>
         </div>
       )}

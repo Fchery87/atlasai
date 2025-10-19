@@ -14,6 +14,12 @@ async function tryPrettier(lang: string | undefined, text: string): Promise<stri
       case "css":
         parser = "css";
         break;
+      case "markdown":
+        parser = "markdown";
+        break;
+      case "yaml":
+        parser = "yaml";
+        break;
       default:
         parser = null;
     }
@@ -33,6 +39,12 @@ async function tryPrettier(lang: string | undefined, text: string): Promise<stri
     } else if (parser === "css") {
       const p = await import("prettier/plugins/postcss");
       plugins.push(p.default || p);
+    } else if (parser === "markdown") {
+      const p = await import("prettier/plugins/markdown");
+      plugins.push(p.default || p);
+    } else if (parser === "yaml") {
+      const p = await import("prettier/plugins/yaml");
+      plugins.push(p.default || p);
     }
     const formatted = await prettier.format(text, { parser: parser as any, plugins });
     return formatted;
@@ -51,6 +63,7 @@ export async function formatContentAsync(lang: string | undefined, text: string)
       case "json":
         return JSON.stringify(JSON.parse(text), null, 2) + "\n";
       case "markdown":
+      case "yaml":
       case "html":
       case "css":
       case "javascript":
