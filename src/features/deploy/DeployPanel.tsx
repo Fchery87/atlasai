@@ -562,58 +562,6 @@ export function DeployPanel() {
           </Button>
         </div>
       </div>
-          {vercelHelp && (
-            <div className="text-xs text-muted-foreground border rounded-md p-2">
-              Steps:
-              <ol className="list-decimal ml-4">
-                <li>Paste your Vercel token and Project name.</li>
-                <li>Optionally set framework, build command, and output dir.</li>
-                <li>We create or patch the project, then request a deployment.</li>
-              </ol>
-            </div>
-          )}
-          <input
-            className="w-full h-9 rounded-md border border-input px-3 text-sm"
-            placeholder="Vercel token"
-            aria-label="Vercel token"
-            value={vercelToken}
-            onChange={(e) => setVercelToken(e.currentTarget.value)}
-          />
-          <input
-            className="w-full h-9 rounded-md border border-input px-3 text-sm"
-            placeholder="Project name"
-            aria-label="Vercel project"
-            value={vercelProject}
-            onChange={(e) => setVercelProject(e.currentTarget.value)}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <input
-              className="w-full h-9 rounded-md border border-input px-3 text-sm"
-              placeholder="framework (e.g., vite)"
-              aria-label="Vercel framework"
-              value={vercelFramework}
-              onChange={(e) => setVercelFramework(e.currentTarget.value)}
-            />
-            <input
-              className="w-full h-9 rounded-md border border-input px-3 text-sm"
-              placeholder="build command"
-              aria-label="Vercel build command"
-              value={vercelBuildCmd}
-              onChange={(e) => setVercelBuildCmd(e.currentTarget.value)}
-            />
-            <input
-              className="w-full h-9 rounded-md border border-input px-3 text-sm"
-              placeholder="output dir"
-              aria-label="Vercel output dir"
-              value={vercelOutDir}
-              onChange={(e) => setVercelOutDir(e.currentTarget.value)}
-            />
-          </div>
-          <Button variant="secondary" onClick={deployVercel} aria-label="Deploy to Vercel" title="Links project/config then requests a deployment">
-            Deploy
-          </Button>
-        </div>
-      </div>
       <div className="rounded-md border p-2">
         <div className="font-medium">Status</div>
         <div aria-live="polite">{status}</div>
