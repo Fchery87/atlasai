@@ -4,14 +4,16 @@ import { Separator } from "./components/ui/separator";
 import { Button } from "./components/ui/button";
 import { ProviderManager } from "./features/providers/ProviderManager";
 import Editor, { DiffEditor } from "@monaco-editor/react";
+import { useProjectStore } from "./lib/store/projectStore";
 
 function Header() {
+  const { current } = useProjectStore();
   return (
     <header className="sticky top-0 z-10 bg-white/80 bg-blur border-b">
       <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center gap-3">
         <Button size="icon" aria-label="Toggle sidebar">☰</Button>
         <nav aria-label="Breadcrumbs" className="text-sm text-muted-foreground">
-          BoltForge / Project
+          BoltForge {current ? `/ ${current.name}` : ""}
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="secondary">Save</Button>
@@ -124,6 +126,69 @@ function TerminalPanel() {
   );
 }
 
+function QuickActions() {
+  const { createProject, exportZip, importZip, current, loadProjects, projects, openProject } = useProjectStore();
+  const [name, setName] = React.useState("");
+  const fileInput = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  const doCreate = async () => {
+    if (!name.trim()) return;
+    await createProject(name.trim());
+    setName("");
+  };
+
+  const doExport = async () => {
+    if (!current) return;
+    const blob = await exportZip();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${current.name}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.currentTarget.files?.[0];
+    if (!f) return;
+    await importZip(f);
+    if (fileInput.current) fileInput.current.value = "";
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <input
+          aria-label="Project name"
+          className="flex-1 h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          placeholder="New project name"
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+        />
+        <Button onClick={doCreate} disabled={!name.trim()}>Create</Button>
+      </div>
+      <div className="flex items-center gap-2">
+        <input ref={fileInput} aria-label="Import ZIP" type="file" accept=".zip" onChange={onImport} />
+        <Button onClick={doExport} disabled={!current}>Export ZIP</Button>
+      </div>
+      <div>
+        <div className="text-xs text-muted-foreground mb-1">Projects</div>
+        <div className="flex flex-wrap gap-2">
+          {projects.map((p) => (
+            <Button key={p.id} variant="secondary" onClick={() => openProject(p.id)} aria-label={`Open ${p.name}`}>
+              {p.name}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -135,8 +200,8 @@ export default function App() {
             <CardContent><ProviderManager /></CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>New Project</CardTitle></CardHeader>
-            <CardContent className="text-sm text-muted-foreground">Templates coming soon.</CardContent>
+            <CardHeader><CardTitle>Projects</CardTitle></CardHeader>
+            <CardContent><QuickActions /></CardContent>
           </Card>
           <Card>
             <CardHeader><CardTitle>Deploy</CardTitle></CardHeader>

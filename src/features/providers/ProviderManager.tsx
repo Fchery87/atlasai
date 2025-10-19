@@ -6,6 +6,7 @@ import { Badge } from "../../components/ui/badge";
 import { ProviderDefinition } from "../../lib/providers/types";
 import { OpenRouterDef, OpenRouterAdapter } from "../../lib/providers/openrouter";
 import { OllamaDef, OllamaAdapter } from "../../lib/providers/ollama";
+import { loadProviderKey, saveProviderKey, clearProviderKey } from "../../lib/crypto/keys";
 
 type ProviderEntry = {
   def: ProviderDefinition;
@@ -29,6 +30,19 @@ export function ProviderManager() {
   const [providers, setProviders] = React.useState<ProviderEntry[]>(initialProviders);
   const [busy, setBusy] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    // Load encrypted keys from storage
+    (async () => {
+      const entries = await Promise.all(
+        initialProviders.map(async (p) => {
+          const { plaintext } = await loadProviderKey(p.def.id);
+          return { ...p, key: plaintext || "" };
+        })
+      );
+      setProviders(entries);
+    })();
+  }, []);
+
   const validate = async (p: ProviderEntry) => {
     setBusy(p.def.id);
     try {
@@ -43,6 +57,12 @@ export function ProviderManager() {
           e.def.id === p.def.id ? { ...e, status: result.ok ? "valid" : "invalid", message: result.message } : e
         )
       );
+      // Persist key on successful validation (or clear if invalid)
+      if (result.ok && p.def.auth.type !== "none" && p.key) {
+        await saveProviderKey(p.def.id, p.key);
+      } else if (!result.ok) {
+        clearProviderKey(p.def.id);
+      }
     } finally {
       setBusy(null);
     }
@@ -50,6 +70,13 @@ export function ProviderManager() {
 
   const updateKey = (id: string, key: string) => {
     setProviders(prev => prev.map(e => (e.def.id === id ? { ...e, key } : e)));
+  };
+
+  const save = async (p: ProviderEntry) => {
+    if (p.def.auth.type !== "none" && p.key) {
+      await saveProviderKey(p.def.id, p.key);
+      setProviders(prev => prev.map(e => (e.def.id === p.def.id ? { ...e, status: "unknown" } : e)));
+    }
   };
 
   return (
@@ -75,6 +102,13 @@ export function ProviderManager() {
             ) : (
               <div className="text-sm text-muted-foreground">No key required</div>
             )}
+            <Button
+              onClick={() => save(p)}
+              variant="secondary"
+              disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+            >
+              Save
+            </Button>
             <Button
               onClick={() => validate(p)}
               disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
