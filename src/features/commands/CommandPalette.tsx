@@ -1,117 +1,194 @@
 import * as React from "react";
-import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
-import JSZip from "jszip";
-import { getGitHubToken, saveEncrypted, loadDecrypted } from "../../lib/oauth/github";
 
-type DeployTarget = "github-pages" | "netlify" | "vercel";
-
-function nsKey(projectId: string | undefined, key: string) {
-  return projectId ? `${key}:${projectId}` : key;
+export function useCommandPalette() {
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen((v) => !v);
+      } else if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  return { open, setOpen };
 }
 
-export function DeployPanel() {
-  const { current, upsertFile } = useProjectStore();
-  const pid = current?.id;
-  const [target, setTarget] = React.useState<DeployTarget | null>(null);
-  const [status, setStatus] = React.useState<string>("Idle");
-  const [logs, setLogs] = React.useState<string[]>([]);
-  const [ghRepo, setGhRepo] = React.useState<string>(""); // owner/repo
-  const [netlifyToken, setNetlifyToken] = React.useState<string>("");
-  const [netlifySiteId, setNetlifySiteId] = React.useState<string>("");
-  const [vercelToken, setVercelToken] = React.useState<string>("");
-  const [vercelProject, setVercelProject] = React.useState<string>("");
-  const [vercelFramework, setVercelFramework] = React.useState<string>("vite");
-  const [vercelBuildCmd, setVercelBuildCmd] = React.useState<string>("npm run build");
-  const [vercelOutDir, setVercelOutDir] = React.useState<string>("dist");
+type Command = {
+  id: string;
+  label: string;
+  run: () => Promise<void> | void;
+  hint?: string;
+};
 
-  const log = (line: string) => setLogs((l) => [...l, line]);
+export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { createFile, renameFile, deleteFile, snapshot, current, currentFilePath, upsertFile } = useProjectStore();
+  const [query, setQuery] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const [useDist, setUseDist] = React.useState<boolean>(true);
-  const [ciBranch, setCiBranch] = React.useState<string>("main");
-  const [userRepoBranch, setUserRepoBranch] = React.useState<string>("main");
-  const [defaultBranch, setDefaultBranch] = React.useState<string>("main");
+  const commands: Command[] = [
+    {
+      id: "reset-split",
+      label: "Reset Workbench Split",
+      hint: "Reset pane sizes",
+      run: async () => {
+        const sizes = [26, 38, 36];
+        localStorage.setItem("bf_split_workbench", JSON.stringify(sizes));
+        window.dispatchEvent(new CustomEvent("bf:split-reset", { detail: { key: "bf_split_workbench", sizes } }));
+      },
+    },
+    {
+      id: "new-file",
+      label: "New File",
+      hint: "Ctrl/Cmd+N in Files",
+      run: async () => {
+        const path = prompt("New file path");
+        if (path) await createFile(path);
+      },
+    },
+    {
+      id: "new-folder",
+      label: "New Folder",
+      run: async () => {
+        const path = prompt("New folder path");
+        if (path) await createFile(path.replace(/\/?$/, "/") + "untitled.txt");
+      },
+    },
+    {
+      id: "rename-file",
+      label: "Rename Current File",
+      hint: "F2",
+      run: async () => {
+        if (!currentFilePath) return;
+        const to = prompt("Rename to", currentFilePath);
+        if (to && to !== currentFilePath) await renameFile(currentFilePath, to);
+      },
+    },
+    {
+      id: "delete-file",
+      label: "Delete Current File",
+      hint: "Del/Backspace in Files",
+      run: async () => {
+        if (!currentFilePath) return;
+        if (confirm(`Delete ${currentFilePath}?`)) await deleteFile(currentFilePath);
+      },
+    },
+    {
+      id: "format-doc",
+      label: "Format Document",
+      run: async () => {
+        if (!current || !currentFilePath) return;
+        const f = current.files.find((x) => x.path === currentFilePath);
+        if (!f) return;
+        const [{ formatContentAsync }, { languageFromPath }] = await Promise.all([
+          import("../../lib/editor/format"),
+          import("../../lib/editor/lang"),
+        ]);
+        const lang = languageFromPath(currentFilePath);
+        const formatted = await formatContentAsync(lang, f.contents);
+        await upsertFile(currentFilePath, formatted);
+      },
+    },
+    {
+      id: "snapshot",
+      label: "Create Snapshot",
+      run: async () => {
+        const label = prompt("Snapshot label") || "snapshot";
+        await snapshot(label);
+      },
+    },
+    {
+      id: "export-zip",
+      label: "Export ZIP",
+      run: async () => {
+        if (!current) return;
+        const blob = await (await import("../../lib/store/projectStore")).useProjectStore.getState().exportZip();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${current.name}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+    },
+  ];
 
-  // Optional status worker (Cloudflare)
-  const [statusWorkerUrl, setStatusWorkerUrl] = React.useState<string>("");
+  const filtered = commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()));
 
-  // Help toggles
-  const [ghHelp, setGhHelp] = React.useState(false);
-  const [netlifyHelp, setNetlifyHelp] = React.useState(false);
-  const [vercelHelp, setVercelHelp] = React.useState(false);
-  const [hideDistBanner, setHideDistBanner] = React.useState(false);
-
-  // Load persisted tokens/config per-project with global fallback
   React.useEffect(() => {
-    (async () => {
-      const keys = [
-        [setNetlifyToken, ["sec_netlify_token", nsKey(pid, "sec_netlify_token")]],
-        [setNetlifySiteId, ["sec_netlify_site", nsKey(pid, "sec_netlify_site")]],
-        [setVercelToken, ["sec_vercel_token", nsKey(pid, "sec_vercel_token")]],
-        [setVercelProject, ["sec_vercel_project", nsKey(pid, "sec_vercel_project")]],
-        [setVercelFramework, ["sec_vercel_framework", nsKey(pid, "sec_vercel_framework")]],
-        [setVercelBuildCmd, ["sec_vercel_build_cmd", nsKey(pid, "sec_vercel_build_cmd")]],
-        [setVercelOutDir, ["sec_vercel_out_dir", nsKey(pid, "sec_vercel_out_dir")]],
-        [setGhRepo, ["sec_github_pages_repo", nsKey(pid, "sec_github_pages_repo")]],
-      ] as const;
+    if (open) {
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [open]);
 
-      for (const [setter, [globalKey, projKey]] of keys) {
-        const v = (await loadDecrypted(projKey)) ?? (await loadDecrypted(globalKey));
-        if (v) setter(v);
-      }
-      const def = (await loadDecrypted(nsKey(pid, "sec_default_branch"))) ?? "main";
-      setDefaultBranch(def);
-      setCiBranch(def);
-      setUserRepoBranch(def);
+  const shortcutList = [
+    { k: "Ctrl/Cmd+S", d: "Save" },
+    { k: "Ctrl/Cmd+Enter", d: "Propose change" },
+    { k: "Shift+Ctrl/Cmd+Enter", d: "Approve staged change" },
+    { k: "Escape", d: "Reject staged change / Close dialogs" },
+    { k: "Ctrl/Cmd+N", d: "New file (in Files)" },
+    { k: "F2", d: "Rename selected file (in Files)" },
+    { k: "Delete/Backspace", d: "Delete selected file (in Files)" },
+    { k: "Ctrl/Cmd+K", d: "Toggle command palette" },
+    { k: "↑/↓, Shift+↑/↓", d: "Navigate/extend selection (in Files)" },
+  ];
 
-      // Optional status worker URL
-      const sw = await loadDecrypted(nsKey(pid, "sec_status_worker_url"));
-      if (sw) setStatusWorkerUrl(sw);
-
-      // Load UI prefs
-      const hide = await loadDecrypted(nsKey(pid, "sec_hide_dist_banner"));
-      setHideDistBanner(hide === "1");
-      const gh = await loadDecrypted(nsKey(pid, "sec_help_gh"));
-      const nl = await loadDecrypted(nsKey(pid, "sec_help_netlify"));
-      const vc = await loadDecrypted(nsKey(pid, "sec_help_vercel"));
-      setGhHelp(gh === "1");
-      setNetlifyHelp(nl === "1");
-      setVercelHelp(vc === "1");
-    })();
-  }, [pid]);
-
-  // Listen for global UI tips reset to soft-refresh local UI states
-  React.useEffect(() => {
-    const onReset = () => {
-      setGhHelp(false);
-      setNetlifyHelp(false);
-      setVercelHelp(false);
-      setHideDistBanner(false);
-    };
-    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
-    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
-  }, []);
-
-  // Save per-project
-  React.useEffect(() => { if (netlifyToken) saveEncrypted(nsKey(pid, "sec_netlify_token"), netlifyToken); }, [netlifyToken, pid]);
-  React.useEffect(() => { if (netlifySiteId) saveEncrypted(nsKey(pid, "sec_netlify_site"), netlifySiteId); }, [netlifySiteId, pid]);
-  React.useEffect(() => { if (vercelToken) saveEncrypted(nsKey(pid, "sec_vercel_token"), vercelToken); }, [vercelToken, pid]);
-  React.useEffect(() => { if (vercelProject) saveEncrypted(nsKey(pid, "sec_vercel_project"), vercelProject); }, [vercelProject, pid]);
-  React.useEffect(() => { if (vercelFramework) saveEncrypted(nsKey(pid, "sec_vercel_framework"), vercelFramework); }, [vercelFramework, pid]);
-  React.useEffect(() => { if (vercelBuildCmd) saveEncrypted(nsKey(pid, "sec_vercel_build_cmd"), vercelBuildCmd); }, [vercelBuildCmd, pid]);
-  React.useEffect(() => { if (vercelOutDir) saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir); }, [vercelOutDir, pid]);
-  React.useEffect(() => { if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo); }, [ghRepo, pid]);
-  React.useEffect(() => { if (defaultBranch) saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch); }, [defaultBranch, pid]);
-  React.useEffect(() => { if (statusWorkerUrl) saveEncrypted(nsKey(pid, "sec_status_worker_url"), statusWorkerUrl); }, [statusWorkerUrl, pid]);
-  // Persist UI prefs
-  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_gh"), ghHelp ? "1" : "0"); }, [ghHelp, pid]);
-  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_netlify"), netlifyHelp ? "1" : "0"); }, [netlifyHelp, pid]);
-  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_vercel"), vercelHelp ? "1" : "0"); }, [vercelHelp, pid]);
-
-  const distMissing = React.useMemo(() => {
-    if (!current || !useDist || hideDistBanner) return false;
-    return !current.files.some((f) => f.path.startsWith("dist/"));
-  }, [current, useDist, hideDistBanner]);
+  if (!open) return null;
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="absolute left-1/2 top-24 -translate-x-1/2 w-full max-w-lg rounded-lg border bg-card shadow-lg">
+        <div className="p-3 border-b">
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            placeholder="Type a command..."
+            aria-label="Command"
+            className="w-full h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          />
+        </div>
+        <div className="max-h-80 overflow-auto p-2">
+          <ul>
+            {filtered.map((c) => (
+              <li key={c.id}>
+                <button
+                  className="w-full text-left rounded px-2 py-2 hover:bg-muted flex items-center justify-between gap-2"
+                  onClick={async () => {
+                    await c.run();
+                    onClose();
+                  }}
+                >
+                  <span>{c.label}</span>
+                  {c.hint && <span className="text-xs text-muted-foreground">{c.hint}</span>}
+                </button>
+              </li>
+            ))}
+            {filtered.length === 0 && <li className="text-sm text-muted-foreground px-2 py-2">No commands</li>}
+          </ul>
+          {!query && (
+            <div className="mt-3 border-t pt-2">
+              <div className="text-xs font-semibold mb-1">Keyboard shortcuts</div>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                {shortcutList.map((s) => (
+                  <li key={s.k} className="flex items-center justify-between">
+                    <span>{s.d}</span>
+                    <span>{s.k}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}, [current, useDist, hideDistBanner]);
 
   const filesForDeploy = React.useCallback(() => {
     if (!current) return [];
