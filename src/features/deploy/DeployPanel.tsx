@@ -19,6 +19,19 @@ export function DeployPanel() {
 
   const log = (line: string) => setLogs((l) => [...l, line]);
 
+  const [useDist, setUseDist] = React.useState<boolean>(true);
+  const filesForDeploy = React.useCallback(() => {
+    if (!current) return [];
+    if (!useDist) return current.files;
+    const dist = current.files.filter((f) => f.path.startsWith("dist/"));
+    if (dist.length === 0) {
+      log("dist/ not found. Falling back to project root files.");
+      return current.files;
+    }
+    // Strip 'dist/' prefix for deployment roots
+    return dist.map((f) => ({ ...f, path: f.path.replace(/^dist\//, "") }));
+  }, [current, useDist]);
+
   const deployGitHubPages = async () => {
     const token = getGitHubToken();
     if (!current || !ghRepo || !token) {
@@ -35,7 +48,8 @@ export function DeployPanel() {
     const branch = "gh-pages";
     const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents`;
 
-    for (const f of current.files) {
+    const files = filesForDeploy();
+    for (const f of files) {
       const path = f.path;
       // Create/update file in gh-pages branch
       let sha: string | undefined;
@@ -75,7 +89,8 @@ export function DeployPanel() {
   const zipCurrent = async (): Promise<Blob | null> => {
     if (!current) return null;
     const zip = new JSZip();
-    for (const f of current.files) {
+    const files = filesForDeploy();
+    for (const f of files) {
       zip.file(f.path, f.contents);
     }
     return zip.generateAsync({ type: "blob" });
@@ -125,6 +140,12 @@ export function DeployPanel() {
 
   return (
     <div className="space-y-2 text-sm">
+      <div className="flex items-center gap-3">
+        <label className="text-xs flex items-center gap-1">
+          <input type="checkbox" checked={useDist} onChange={(e) => setUseDist(e.currentTarget.checked)} aria-label="Use dist/ folder if present" />
+          Use dist/ if present
+        </label>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div className="space-y-2">
           <div className="font-medium">GitHub Pages</div>

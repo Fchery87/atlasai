@@ -20,9 +20,17 @@ export function GitPanel() {
   const [repoUrl, setRepoUrl] = React.useState("");
   const [branch, setBranch] = React.useState("main");
   const [status, setStatus] = React.useState("Idle");
-  const [ghClientId, setGhClientId] = React.useState<string>("");
-  const [workerUrl, setWorkerUrl] = React.useState<string>("");
+  const [ghClientId, setGhClientId] = React.useState<string>(() => localStorage.getItem("gh_client_id") || "");
+  const [workerUrl, setWorkerUrl] = React.useState<string>(() => localStorage.getItem("gh_worker_url") || "");
   const [token, setToken] = React.useState<string | null>(getGitHubToken());
+
+  React.useEffect(() => {
+    // Persist config
+    localStorage.setItem("gh_client_id", ghClientId);
+  }, [ghClientId]);
+  React.useEffect(() => {
+    localStorage.setItem("gh_worker_url", workerUrl);
+  }, [workerUrl]);
 
   React.useEffect(() => {
     // Handle OAuth callback if code present
@@ -92,28 +100,29 @@ export function GitPanel() {
       setStatus("Sign in to GitHub first");
       return;
     }
-    setStatus(`Pushing ${current.files.length} file(s) to ${parsed.owner}/${parsed.repo}@${branch}...`);
-    // Use GitHub Contents API to create/update files
-    const apiBase = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents`;
+    setStatus(`Syncing with ${parsed.owner}/${parsed.repo}@${branch}...`);
+    const apiBase = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}`;
+    // Fetch repo tree to detect deletes
+    const treeResp = await fetch(`${apiBase}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+    });
+    let remoteFiles: Record<string, string> = {};
+    if (treeResp.ok) {
+      const tree = await treeResp.json().catch(() => null);
+      (tree?.tree || []).forEach((n: any) => {
+        if (n.type === "blob") remoteFiles[n.path] = n.sha;
+      });
+    }
+
+    // Push updates and additions
+    const contentsBase = `${apiBase}/contents`;
+    const localPaths = new Set(current.files.map((f) => f.path));
     for (const f of current.files) {
       const path = f.path;
-      // Get current sha if exists
-      let sha: string | undefined;
-      const headResp = await fetch(`${apiBase}/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-      });
-      if (headResp.ok) {
-        const js = await headResp.json().catch(() => null);
-        sha = js?.sha;
-      }
+      let sha: string | undefined = remoteFiles[path];
       const content = btoa(unescape(encodeURIComponent(f.contents)));
-      const body = {
-        message: `Update ${path} via BoltForge`,
-        content,
-        branch,
-        sha,
-      };
-      const putResp = await fetch(`${apiBase}/${encodeURIComponent(path)}`, {
+      const body = { message: `Update ${path} via BoltForge`, content, branch, sha };
+      const putResp = await fetch(`${contentsBase}/${encodeURIComponent(path)}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -124,7 +133,35 @@ export function GitPanel() {
         return;
       }
     }
-    setStatus(`Pushed to ${parsed.owner}/${parsed.repo}@${branch}`);
+
+    // Ensure .gitignore if present locally
+    if (localPaths.has(".gitignore")) {
+      const file = current.files.find((f) => f.path === ".gitignore")!;
+      const content = btoa(unescape(encodeURIComponent(file.contents)));
+      const body = { message: "Update .gitignore via BoltForge", content, branch, sha: remoteFiles[".gitignore"] };
+      await fetch(`${contentsBase}/.gitignore`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).catch(() => {});
+    }
+
+    // Delete remote files not present locally (excluding .git and safeguards)
+    const deleteCandidates = Object.keys(remoteFiles).filter((p) => !localPaths.has(p) && !p.startsWith(".git"));
+    for (const p of deleteCandidates) {
+      const delResp = await fetch(`${contentsBase}/${encodeURIComponent(p)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Delete ${p} via BoltForge`, branch, sha: remoteFiles[p] }),
+      });
+      if (!delResp.ok) {
+        const err = await delResp.text();
+        setStatus(`Delete failed on ${p}: ${delResp.status} ${err.slice(0, 120)}`);
+        return;
+      }
+    }
+
+    setStatus(`Pushed ${current.files.length} file(s); deleted ${deleteCandidates.length} file(s) on ${parsed.owner}/${parsed.repo}@${branch}`);
   };
 
   return (
