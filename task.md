@@ -15,10 +15,11 @@ Legend:
 ### 6.1 Prompt → Code
 - [x] Chat panel UI
   - [x] Model picker per message
-  - [ ] Attachments (images/files)
+  - [x] Attachments (text/code files + optional images for vision-capable providers)
   - [x] Streaming responses (wired to providers)
   - [ ] Token/cost estimate in header
-  - [ ] Stop/undo controls
+  - [x] Stop streaming
+  - [x] Undo/Redo last apply
 - [x] Diff approval step for changes generated (manual and snapshot-driven)
 - [x] Rollback via snapshots
 
@@ -43,7 +44,7 @@ Legend:
 - [x] Preview iframe with strict sandbox and CSP
 - [x] Console proxy postMessage bridge to Terminal
 - [~] Live reload preview (updates on file changes; improve debounce/config later)
-- [ ] Templates gallery (React/Vite, Next.js, Vue, Astro, Remix, Expo)
+- [x] Templates gallery (Vanilla HTML, SPA Router, Tailwind CDN, Tailwind Dark Toggle, Markdown Static Blog)
 
 ### 6.4 Providers (BYOK) – Extensible LLM Registry
 - [x] Provider types (zod) and adapter interface
@@ -53,7 +54,9 @@ Legend:
 - [x] Groq adapter
 - [x] Anthropic Claude Code adapter
 - [x] GPT‑5 Codex placeholder adapter
-- [ ] Custom provider form (from schema)
+- [x] Custom provider form w/ zod schema validation + custom headers (encrypted)
+- [x] Built-in override flow to bootstrap custom providers from built-ins
+- [x] Duplicate action for customs
 - [x] Credentials stored client-side encrypted; optional sync via OAuth not implemented
 
 ### 6.5 Deploy
@@ -62,7 +65,7 @@ Legend:
   - GitHub Pages: upload to gh-pages; CI workflow provided
   - Netlify: hash-based incremental uploads
   - Vercel: project linking + config, then deployment request
-- [ ] SPA routing guidance and steps
+- [x] SPA routing guidance and helpers (GH Pages 404.html, Netlify _redirects, vercel.json rewrites)
 
 ## 7) Nonfunctional Requirements
 - [~] Performance: lazy Monaco; Prettier parsers lazy; further profiling TBD
@@ -73,7 +76,7 @@ Legend:
 
 ## 8) Detailed UI/UX – DSS
 - [x] Canonical shell with Bento grid (Header, Editor, Chat, Preview, Terminal)
-- [ ] Resizable panes (SplitPane with persisted sizes)
+- [x] Resizable panes (SplitPane with persisted sizes + keyboard resizing + reset)
 - [x] Skip link and aria labels; breadcrumbs; aria-live on terminal output
 - [~] Component contracts: DiffView minimal; PromptInput and SplitPane contracts pending
 
@@ -90,8 +93,8 @@ Legend:
 ## 12) CI/CD & Quality
 - [x] GitHub Actions CI: typecheck, lint, unit tests, build, Playwright E2E
 - [x] GitHub Pages workflow: build and deploy dist/ to Pages
-- [ ] Security scanning: npm audit/OSV/dep check on PRs
-- [ ] Precommit hooks: lint-staged + prettier
+- [x] Security scanning: npm audit + OSV scanner on PRs and schedule
+- [x] Precommit hooks: husky + lint-staged + prettier
 - [ ] Release: tag + changelog; Pages/Workers deploy via Actions
 
 ## 13) TDD Strategy
@@ -99,7 +102,7 @@ Legend:
 - [x] Unit: provider adapter tests (existing + new providers)
 - [x] Unit: deploy and git helpers (zip pack, sha1, delete calc)
 - [x] E2E: smoke test; Axe accessibility tests on home, palette, snapshots, integrations
-- [ ] E2E: Prompt→Diff→Apply→Preview flow
+- [~] E2E: Prompt→Diff→Apply→Preview flow (basic coverage; expand scenarios)
 - [ ] Contract tests: ProviderAdapter compliance suite
 
 ## 14) Roadmap & Phases
@@ -126,23 +129,23 @@ Phase 2 (Git & Deploy)
 
 Phase 3 (LLM Extensibility)
 - [x] Additional providers (Groq, Anthropic Claude Code, GPT‑5 placeholder)
-- [ ] Custom provider form w/ zod schema validation
+- [x] Custom provider form w/ zod schema validation + encrypted headers
+- [x] Built-in overrides + duplicate customs
 
 Phase 4 (Polish & Desktop)
-- [ ] Resizable split panes with persistence
+- [x] Resizable split panes with persistence + keyboard controls
 - [x] Command palette
 - [ ] Offline caching / PWA
 - [ ] Optional Electron packaging
 
 ## 17) Acceptance Criteria (MVP)
 - [~] Create project → edit file → run preview → apply AI change → see diff → deploy to GH Pages
-  - Current status: Chat can stream and stage diffs; manual approve applies; GH Pages deploy workflow present. Add E2E to demarcate end-to-end.
+  - Current status: Chat can stream and stage diffs; manual approve applies; GH Pages deploy workflow present; SPA helpers included. E2E basic coverage exists; expand tests for full flow.
 - [x] Add provider via UI; validate key; use it in a chat that edits code
 - [x] Critical flows keyboard-navigable; Axe checks pass for main screen and key interactions
 - [x] No server-side secret storage by default
 
 ## Summary
-- Phase 0 and Phase 1: COMPLETE.
-- Phase 2: COMPLETE (OAuth exchange, Git import/push, deploy flows, GH Pages CI, optional deploy-status polling worker and UI).
-- Phase 3: Additional providers integrated; custom provider form pending.
-- Remaining polish: Split panes, templates gallery, security scanning in CI, precommit hooks, full E2E Prompt→Diff→Apply flow, custom provider schema form.
+- Phase 0–2: COMPLETE.
+- Phase 3: COMPLETE (additional providers, custom provider with zod + encrypted headers, overrides/duplication).
+- Remaining polish: Full E2E Prompt→Diff→Apply scenarios, provider adapter compliance tests, expanded template catalog, optional LLM relay, PWA/Electron.
