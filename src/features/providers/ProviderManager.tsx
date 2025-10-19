@@ -48,6 +48,12 @@ export function ProviderManager() {
   }, []);
 
   React.useEffect(() => {
+    const onReset = () => setShowHelp(false);
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+  }, []);
+
+  React.useEffect(() => {
     // Persist help toggle globally
     saveEncrypted("sec_help_providers", showHelp ? "1" : "0");
   }, [showHelp]);

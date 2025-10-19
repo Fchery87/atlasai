@@ -49,6 +49,12 @@ export function GitPanel() {
   }, [showHelp, pid]);
 
   React.useEffect(() => {
+    const onReset = () => setShowHelp(false);
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+  }, []);
+
+  React.useEffect(() => {
     // Persist config encrypted
     if (ghClientId || workerUrl) {
       saveGitHubClientConfig(ghClientId, workerUrl);

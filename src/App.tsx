@@ -31,6 +31,8 @@ function Header() {
                 }
               }
               toRemove.forEach((k) => localStorage.removeItem(k));
+              // Notify panels to refresh their local UI tip states immediately
+              window.dispatchEvent(new CustomEvent("bf:reset-ui-tips"));
             }}
           >
             Reset All UI Tips

@@ -90,6 +90,12 @@ export function FileTree() {
     saveEncrypted(pid ? `sec_help_files:${pid}` : "sec_help_files", showHelp ? "1" : "0");
   }, [showHelp, pid]);
 
+  React.useEffect(() => {
+    const onReset = () => setShowHelp(false);
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+  }, []);
+
   const [creating, setCreating] = React.useState<boolean>(false);
   const [creatingPath, setCreatingPath] = React.useState<string | null>(null); // "" for top-level, or folder path
   const [createValue, setCreateValue] = React.useState<string>("");

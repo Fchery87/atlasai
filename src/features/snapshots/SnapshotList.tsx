@@ -42,6 +42,12 @@ export function SnapshotList() {
     saveEncrypted(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots", showHelp ? "1" : "0");
   }, [showHelp, current?.id]);
 
+  React.useEffect(() => {
+    const onReset = () => setShowHelp(false);
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+  }, []);
+
   const onRestore = async (id: string) => {
     if (confirm("Restore this snapshot? Current files will be replaced.")) {
       await restoreSnapshot(id);

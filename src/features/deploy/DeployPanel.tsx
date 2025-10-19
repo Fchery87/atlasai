@@ -73,6 +73,18 @@ export function DeployPanel() {
     })();
   }, [pid]);
 
+  // Listen for global UI tips reset to soft-refresh local UI states
+  React.useEffect(() => {
+    const onReset = () => {
+      setGhHelp(false);
+      setNetlifyHelp(false);
+      setVercelHelp(false);
+      setHideDistBanner(false);
+    };
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+  }, []);
+
   // Save per-project
   React.useEffect(() => { if (netlifyToken) saveEncrypted(nsKey(pid, "sec_netlify_token"), netlifyToken); }, [netlifyToken, pid]);
   React.useEffect(() => { if (netlifySiteId) saveEncrypted(nsKey(pid, "sec_netlify_site"), netlifySiteId); }, [netlifySiteId, pid]);
