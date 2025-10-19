@@ -1,3 +1,7 @@
 name = "boltforge-oauth"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+
+# Set these with: wrangler secret put GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
+[vars]
+GITHUB_REDIRECT_URI = "http://localhost:8787/oauth/callback"

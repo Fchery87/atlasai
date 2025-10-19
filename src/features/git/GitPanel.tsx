@@ -1,26 +1,155 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
+import { useProjectStore } from "../../lib/store/projectStore";
+import { startGitHubOAuth, completeGitHubOAuth, getGitHubToken, clearGitHubToken } from "../../lib/oauth/github";
+
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+  try {
+    const u = new URL(url.replace(/\.git$/, ""));
+    if (u.hostname !== "github.com") return null;
+    const [owner, repo] = u.pathname.replace(/^\/+/, "").split("/");
+    if (!owner || !repo) return null;
+    return { owner, repo };
+  } catch {
+    return null;
+  }
+}
 
 export function GitPanel() {
+  const { current, importZip } = useProjectStore();
   const [repoUrl, setRepoUrl] = React.useState("");
   const [branch, setBranch] = React.useState("main");
   const [status, setStatus] = React.useState("Idle");
+  const [ghClientId, setGhClientId] = React.useState<string>("");
+  const [workerUrl, setWorkerUrl] = React.useState<string>("");
+  const [token, setToken] = React.useState<string | null>(getGitHubToken());
+
+  React.useEffect(() => {
+    // Handle OAuth callback if code present
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("code") && url.searchParams.get("state")) {
+      completeGitHubOAuth().then((res) => {
+        if (res.access_token) {
+          setToken(res.access_token);
+          setStatus("GitHub signed in");
+        } else {
+          setStatus(`OAuth error: ${res.error}`);
+        }
+        // Clean URL
+        window.history.replaceState({}, "", url.pathname);
+      });
+    }
+  }, []);
+
+  const signIn = async () => {
+    if (!ghClientId || !workerUrl) {
+      setStatus("Set GitHub Client ID and Worker URL");
+      return;
+    }
+    await startGitHubOAuth({
+      clientId: ghClientId,
+      redirectUri: window.location.origin,
+      scope: "repo",
+      workerCallbackUrl: workerUrl,
+    });
+  };
+
+  const signOut = () => {
+    clearGitHubToken();
+    setToken(null);
+    setStatus("Signed out");
+  };
 
   const importRepo = async () => {
     if (!repoUrl.trim()) return;
-    setStatus("Fetching repository (scaffold)...");
-    // Phase 2 scaffold: implement git clone via server/worker or isomorphic-git
-    setTimeout(() => setStatus(`Imported (simulated): ${repoUrl}`), 600);
+    const parsed = parseGitHubUrl(repoUrl);
+    if (!parsed) {
+      setStatus("Invalid GitHub URL");
+      return;
+    }
+    const ref = branch || "main";
+    const zipUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/zipball/${encodeURIComponent(ref)}`;
+    setStatus(`Fetching ${parsed.owner}/${parsed.repo}@${ref}...`);
+    const resp = await fetch(zipUrl, token ? { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } } : undefined);
+    if (!resp.ok) {
+      setStatus(`Fetch failed: ${resp.status}`);
+      return;
+    }
+    const blob = await resp.blob();
+    const file = new File([blob], `${parsed.repo}-${ref}.zip`, { type: "application/zip" });
+    await importZip(file);
+    setStatus(`Imported ${parsed.owner}/${parsed.repo}@${ref}`);
   };
 
   const pushRepo = async () => {
-    setStatus("Pushing changes (scaffold)...");
-    // Phase 2 scaffold: implement push via GitHub API with OAuth token
-    setTimeout(() => setStatus(`Pushed to ${branch} (simulated)`), 600);
+    if (!current) return;
+    const parsed = parseGitHubUrl(repoUrl);
+    if (!parsed) {
+      setStatus("Invalid GitHub URL");
+      return;
+    }
+    if (!token) {
+      setStatus("Sign in to GitHub first");
+      return;
+    }
+    setStatus(`Pushing ${current.files.length} file(s) to ${parsed.owner}/${parsed.repo}@${branch}...`);
+    // Use GitHub Contents API to create/update files
+    const apiBase = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents`;
+    for (const f of current.files) {
+      const path = f.path;
+      // Get current sha if exists
+      let sha: string | undefined;
+      const headResp = await fetch(`${apiBase}/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+      });
+      if (headResp.ok) {
+        const js = await headResp.json().catch(() => null);
+        sha = js?.sha;
+      }
+      const content = btoa(unescape(encodeURIComponent(f.contents)));
+      const body = {
+        message: `Update ${path} via BoltForge`,
+        content,
+        branch,
+        sha,
+      };
+      const putResp = await fetch(`${apiBase}/${encodeURIComponent(path)}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!putResp.ok) {
+        const err = await putResp.text();
+        setStatus(`Failed on ${path}: ${putResp.status} ${err.slice(0, 120)}`);
+        return;
+      }
+    }
+    setStatus(`Pushed to ${parsed.owner}/${parsed.repo}@${branch}`);
   };
 
   return (
     <div className="space-y-2 text-sm">
+      <div className="flex gap-2 items-center">
+        <input
+          className="flex-1 h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          placeholder="GitHub OAuth Client ID"
+          aria-label="GitHub Client ID"
+          value={ghClientId}
+          onChange={(e) => setGhClientId(e.currentTarget.value)}
+        />
+        <input
+          className="flex-1 h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          placeholder="OAuth Worker URL (e.g., https://your-worker.workers.dev)"
+          aria-label="Worker URL"
+          value={workerUrl}
+          onChange={(e) => setWorkerUrl(e.currentTarget.value)}
+        />
+        {token ? (
+          <Button variant="secondary" onClick={signOut} aria-label="Sign out">Sign out</Button>
+        ) : (
+          <Button onClick={signIn} aria-label="Sign in with GitHub">Sign in</Button>
+        )}
+      </div>
       <div className="flex gap-2">
         <input
           className="flex-1 h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -44,6 +173,7 @@ export function GitPanel() {
       <div className="rounded-md border p-2">
         <div className="font-medium">Status</div>
         <div aria-live="polite">{status}</div>
+        {token && <div className="text-xs text-muted-foreground mt-1">Signed in to GitHub</div>}
       </div>
     </div>
   );
