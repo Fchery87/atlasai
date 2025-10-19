@@ -331,7 +331,10 @@ export function DeployPanel() {
     setStatus("Vercel deployment request sent, polling status...");
     if (depId) {
       const pollUrl = statusWorkerUrl ? `${statusWorkerUrl}/status/vercel?id=${encodeURIComponent(depId)}` : `https://api.vercel.com/v13/deployments/${encodeURIComponent(depId)}`;
-      const pollHeaders = statusWorkerUrl ? { Authorization: `Bearer ${vercelToken}` } : { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" };
+      const pollHeaders: Record<string, string> = { Authorization: `Bearer ${vercelToken}` };
+      if (!statusWorkerUrl) {
+        pollHeaders["Content-Type"] = "application/json";
+      }
       let attempts = 0;
       const maxAttempts = 20;
       const interval = 3000;
@@ -751,3 +754,4 @@ export function DeployPanel() {
       </div>
     </div>
   );
+}
