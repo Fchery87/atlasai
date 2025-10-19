@@ -190,7 +190,13 @@ export function ProviderManager() {
       return;
     }
     setErrors({});
-    const id = newProv.id.trim() || newProv.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const idRaw = newProv.id.trim() || newProv.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const builtins = new Set(["openrouter","ollama","groq","anthropic","gpt5"]);
+    if (builtins.has(idRaw)) {
+      alert("Provider ID conflicts with a built-in. Please choose a different ID (e.g., add '-override').");
+      return;
+    }
+    const id = idRaw;
     const headerObj = headers.reduce<Record<string, string>>((acc, h) => {
       if (h.key.trim()) acc[h.key.trim()] = h.value;
       return acc;
@@ -214,8 +220,12 @@ export function ProviderManager() {
     const existingRaw = localStorage.getItem("bf_custom_providers");
     let list: ProviderDefinition[] = [];
     try { if (existingRaw) list = JSON.parse(existingRaw); } catch {}
-    // Replace if id exists
+    // Overwrite confirmation if ID exists and not editing same
     const idx = list.findIndex((p) => p.id === def.id);
+    if (idx >= 0 && editId !== def.id) {
+      const ok = confirm(`A provider with ID '${def.id}' already exists. Overwrite it?`);
+      if (!ok) return;
+    }
     if (idx >= 0) list[idx] = def; else list.push(def);
     localStorage.setItem("bf_custom_providers", JSON.stringify(list));
     // Persist custom headers encrypted under per-provider key
@@ -229,6 +239,10 @@ export function ProviderManager() {
       const mergedDef = { ...def, headers: Object.keys(headerObj).length ? headerObj : undefined };
       if (editId && prev.some(e => e.def.id === editId)) {
         return prev.map(e => (e.def.id === editId ? { ...e, def: mergedDef } : e));
+      }
+      // If an item with same id already exists in UI, replace it
+      if (prev.some(e => e.def.id === def.id)) {
+        return prev.map(e => (e.def.id === def.id ? { ...e, def: mergedDef } : e));
       }
       return [...prev, { def: mergedDef, key: "", status: "unknown" }];
     });
@@ -277,7 +291,32 @@ export function ProviderManager() {
                 <CardTitle className="flex items-center gap-2">
                   <span className="font-semibold">{p.def.name}</span>
                   <StatusBadge status={p.status} />
-                  {!isBuiltin && (
+                  {isBuiltin ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Create override from this built-in"
+                      aria-label={`Override ${p.def.name}`}
+                      onClick={() => {
+                        setEditId(null); // creating new override
+                        setNewProv({
+                          id: `${p.def.id}-override`,
+                          name: `${p.def.name} (override)`,
+                          baseUrl: p.def.baseUrl,
+                          authType: (p.def.auth.type as any) ?? "apiKey",
+                          keyName: p.def.auth.keyName || "Authorization",
+                          models: (p.def.models || []).map(m => m.id).join(","),
+                        });
+                        const hdrs = p.def.headers || {};
+                        const rows = Object.keys(hdrs).map(k => ({ key: k, value: hdrs[k]! }));
+                        setHeaders(rows);
+                        setHeaderMask(rows.map(() => true));
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      Override
+                    </Button>
+                  ) : (
                     <>
                       <Button
                         variant="ghost"
