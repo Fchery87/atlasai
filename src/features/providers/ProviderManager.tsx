@@ -139,6 +139,7 @@ export function ProviderManager() {
     models: string;
   }>({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
   const [headers, setHeaders] = React.useState<Array<{ key: string; value: string }>>([]);
+  const [headerMask, setHeaderMask] = React.useState<boolean[]>([]);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
   const CustomDefSchema = z.object({
@@ -151,8 +152,24 @@ export function ProviderManager() {
     headers: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
   });
 
-  const addHeaderRow = () => setHeaders((rows) => [...rows, { key: "", value: "" }]);
-  const removeHeaderRow = (idx: number) => setHeaders((rows) => rows.filter((_, i) => i !== idx));
+  React.useEffect(() => {
+    // Keep mask array in sync with rows length (default to hidden)
+    setHeaderMask((m) => {
+      const next = m.slice();
+      while (next.length < headers.length) next.push(true);
+      if (next.length > headers.length) next.length = headers.length;
+      return next;
+    });
+  }, [headers.length]);
+
+  const addHeaderRow = () => {
+    setHeaders((rows) => [...rows, { key: "", value: "" }]);
+    setHeaderMask((m) => [...m, true]);
+  };
+  const removeHeaderRow = (idx: number) => {
+    setHeaders((rows) => rows.filter((_, i) => i !== idx));
+    setHeaderMask((m) => m.filter((_, i) => i !== idx));
+  };
   const updateHeaderRow = (idx: number, field: "key" | "value", val: string) =>
     setHeaders((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)));
 
@@ -240,44 +257,73 @@ export function ProviderManager() {
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {providers.map(p => (
-          <Card key={p.def.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="font-semibold">{p.def.name}</span>
-                <StatusBadge status={p.status} />
-              </CardTitle>
-              <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
-            </CardHeader>
-            <CardContent className="flex items-end gap-2">
-              {p.def.auth.type !== "none" ? (
-                <Input
-                  aria-label={`${p.def.name} API key`}
-                  placeholder={p.def.auth.type === "apiKey" ? "API Key" : "Bearer token"}
-                  type="password"
-                  value={p.key}
-                  onChange={e => updateKey(p.def.id, e.currentTarget.value)}
-                />
-              ) : (
-                <div className="text-sm text-muted-foreground">No key required</div>
-              )}
-              <Button
-                onClick={() => save(p)}
-                variant="secondary"
-                disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
-              >
-                Save
-              </Button>
-              <Button
-                onClick={() => validate(p)}
-                disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
-                aria-busy={busy === p.def.id}
-              >
-                {busy === p.def.id ? "Validating..." : "Validate"}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+        {providers.map(p => {
+          const builtins = new Set(["openrouter","ollama","groq","anthropic","gpt5"]);
+          const isBuiltin = builtins.has(p.def.id);
+          return (
+            <Card key={p.def.id}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="font-semibold">{p.def.name}</span>
+                  <StatusBadge status={p.status} />
+                  {!isBuiltin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Delete custom provider"
+                      aria-label={`Delete ${p.def.name}`}
+                      onClick={async () => {
+                        if (!confirm(`Delete provider '${p.def.name}'?`)) return;
+                        // remove from local provider list
+                        setProviders(prev => prev.filter(e => e.def.id !== p.def.id));
+                        // remove from persisted bf_custom_providers
+                        const raw = localStorage.getItem("bf_custom_providers");
+                        try {
+                          const list: ProviderDefinition[] = raw ? JSON.parse(raw) : [];
+                          const filtered = list.filter((d: any) => d.id !== p.def.id);
+                          localStorage.setItem("bf_custom_providers", JSON.stringify(filtered));
+                        } catch {}
+                        // remove encrypted headers and key
+                        localStorage.removeItem(`sec_provider_headers:${p.def.id}`);
+                        clearProviderKey(p.def.id);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </CardTitle>
+                <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
+              </CardHeader>
+              <CardContent className="flex items-end gap-2">
+                {p.def.auth.type !== "none" ? (
+                  <Input
+                    aria-label={`${p.def.name} API key`}
+                    placeholder={p.def.auth.type === "apiKey" ? "API Key" : "Bearer token"}
+                    type="password"
+                    value={p.key}
+                    onChange={e => updateKey(p.def.id, e.currentTarget.value)}
+                  />
+                ) : (
+                  <div className="text-sm text-muted-foreground">No key required</div>
+                )}
+                <Button
+                  onClick={() => save(p)}
+                  variant="secondary"
+                  disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={() => validate(p)}
+                  disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+                  aria-busy={busy === p.def.id}
+                >
+                  {busy === p.def.id ? "Validating..." : "Validate"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="rounded-md border p-3 space-y-2">
@@ -325,7 +371,22 @@ export function ProviderManager() {
             {headers.map((h, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <Input aria-label={`Header key ${idx+1}`} placeholder="Header key" value={h.key} onChange={(e) => updateHeaderRow(idx, "key", e.currentTarget.value)} />
-                <Input aria-label={`Header value ${idx+1}`} placeholder="Header value" value={h.value} onChange={(e) => updateHeaderRow(idx, "value", e.currentTarget.value)} />
+                <Input
+                  aria-label={`Header value ${idx+1}`}
+                  placeholder="Header value"
+                  type={headerMask[idx] ? "password" : "text"}
+                  value={h.value}
+                  onChange={(e) => updateHeaderRow(idx, "value", e.currentTarget.value)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={headerMask[idx] ? "Show value" : "Hide value"}
+                  title={headerMask[idx] ? "Show value" : "Hide value"}
+                  onClick={() => setHeaderMask((m) => m.map((v, i) => (i === idx ? !v : v)))}
+                >
+                  {headerMask[idx] ? "👁️" : "🙈"}
+                </Button>
                 <Button variant="ghost" size="sm" aria-label="Remove header" title="Remove" onClick={() => removeHeaderRow(idx)}>Remove</Button>
               </div>
             ))}
