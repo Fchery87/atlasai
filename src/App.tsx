@@ -5,6 +5,8 @@ import { Button } from "./components/ui/button";
 import { ProviderManager } from "./features/providers/ProviderManager";
 import Editor, { DiffEditor } from "@monaco-editor/react";
 import { useProjectStore } from "./lib/store/projectStore";
+import { languageFromPath } from "./lib/editor/lang";
+import { useDebounced } from "./lib/hooks/useDebounced";
 
 function Header() {
   const { current } = useProjectStore();
@@ -28,6 +30,8 @@ function EditorPanel() {
   const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock } = useProjectStore();
   const file = current?.files.find((f) => f.path === currentFilePath);
   const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
+  const debouncedCode = useDebounced(code, 150);
+  const lang = languageFromPath(currentFilePath);
 
   React.useEffect(() => {
     setCode(file?.contents ?? "");
@@ -35,11 +39,37 @@ function EditorPanel() {
 
   const canStage = !!currentFilePath;
   const onStage = () => {
-    if (currentFilePath) stageDiff(currentFilePath, code);
+    if (currentFilePath) stageDiff(currentFilePath, debouncedCode);
   };
   const onSave = async () => {
-    if (currentFilePath) await upsertFile(currentFilePath, code);
+    if (currentFilePath) await upsertFile(currentFilePath, debouncedCode);
   };
+
+  // Keyboard shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Enter stage, Shift+Cmd/Ctrl+Enter approve, Escape reject
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (!isMeta) {
+        if (e.key === "Escape" && staged) {
+          e.preventDefault();
+          rejectDiff();
+        }
+        return;
+      }
+      if (e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        onSave();
+      } else if (e.key === "Enter" && e.shiftKey) {
+        e.preventDefault();
+        if (staged && !fileLock) approveDiff();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        onStage();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath]);
 
   return (
     <Card className="h-full flex flex-col">
@@ -59,8 +89,9 @@ function EditorPanel() {
       <CardContent className="p-0 grow min-h-[200px]">
         <Editor
           height="100%"
-          defaultLanguage="typescript"
-          value={code}
+          defaultLanguage={lang}
+          language={lang}
+          value={debouncedCode}
           onChange={(v) => setCode(v ?? "")}
           options={{ fontSize: 13, minimap: { enabled: false } }}
         />
@@ -255,6 +286,7 @@ function QuickActions() {
 import { FileTree } from "./features/files/FileTree";
 import { SearchBar } from "./features/search/SearchBar";
 import { useTerminalStore } from "./lib/store/terminalStore";
+import { SnapshotList } from "./features/snapshots/SnapshotList";
 
 export default function App() {
   return (
@@ -280,6 +312,10 @@ export default function App() {
             <Card>
               <CardHeader><CardTitle>Files</CardTitle></CardHeader>
               <CardContent><FileTree /></CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Snapshots</CardTitle></CardHeader>
+              <CardContent><SnapshotList /></CardContent>
             </Card>
             <TerminalPanel />
           </div>

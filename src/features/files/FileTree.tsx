@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
 
 export function FileTree() {
-  const { current, selectFile, currentFilePath, deleteFile, snapshot } = useProjectStore();
+  const { current, selectFile, currentFilePath, deleteFile, snapshot, createFile, renameFile } = useProjectStore();
   const files = current?.files ?? [];
 
   const onDelete = async (path: string) => {
@@ -17,11 +17,34 @@ export function FileTree() {
     await snapshot(label);
   };
 
+  const onCreate = async () => {
+    const path = prompt("New file path (e.g., index.html)");
+    if (!path) return;
+    try {
+      await createFile(path);
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to create file");
+    }
+  };
+
+  const onRename = async (oldPath: string) => {
+    const newPath = prompt("Rename to", oldPath);
+    if (!newPath || newPath === oldPath) return;
+    try {
+      await renameFile(oldPath, newPath);
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to rename file");
+    }
+  };
+
   return (
     <div className="text-sm">
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">Files</div>
-        <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot">Snapshot</Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={onCreate} aria-label="Create file">New</Button>
+          <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot">Snapshot</Button>
+        </div>
       </div>
       <ul className="space-y-1">
         {files.map((f) => (
@@ -33,9 +56,14 @@ export function FileTree() {
             >
               {f.path}
             </button>
-            <Button size="sm" variant="ghost" aria-label={`Delete ${f.path}`} onClick={() => onDelete(f.path)}>
-              ✕
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="ghost" aria-label={`Rename ${f.path}`} onClick={() => onRename(f.path)}>
+                ✎
+              </Button>
+              <Button size="sm" variant="ghost" aria-label={`Delete ${f.path}`} onClick={() => onDelete(f.path)}>
+                ✕
+              </Button>
+            </div>
           </li>
         ))}
         {files.length === 0 && <li className="text-muted-foreground">No files yet</li>}

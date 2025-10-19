@@ -28,9 +28,12 @@ type Actions = {
   openProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
   selectFile: (path?: string) => void;
+  createFile: (path: string) => Promise<void>;
+  renameFile: (oldPath: string, newPath: string) => Promise<void>;
   upsertFile: (path: string, contents: string) => Promise<void>;
   deleteFile: (path: string) => Promise<void>;
   snapshot: (label: string) => Promise<Snapshot>;
+  restoreSnapshot: (id: string) => Promise<void>;
   stageDiff: (path: string, after: string) => void;
   approveDiff: () => Promise<void>;
   rejectDiff: () => void;
@@ -147,6 +150,30 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     set({ currentFilePath: path });
   },
 
+  async createFile(path) {
+    const state = get();
+    if (!state.current) throw new Error("No project open");
+    if (state.current.files.some((f) => f.path === path)) {
+      throw new Error("File already exists");
+    }
+    const now = Date.now();
+    const updated: Project = { ...state.current, files: [...state.current.files, { path, contents: "", updatedAt: now }] };
+    await putProject({ id: updated.id, data: updated });
+    set({ current: updated, currentFilePath: path, previewHtml: buildPreviewHTML(updated) });
+  },
+
+  async renameFile(oldPath, newPath) {
+    const state = get();
+    if (!state.current) throw new Error("No project open");
+    if (state.current.files.some((f) => f.path === newPath)) {
+      throw new Error("Target exists");
+    }
+    const files = state.current.files.map((f) => (f.path === oldPath ? { ...f, path: newPath, updatedAt: Date.now() } : f));
+    const updated: Project = { ...state.current, files };
+    await putProject({ id: updated.id, data: updated });
+    set({ current: updated, currentFilePath: state.currentFilePath === oldPath ? newPath : state.currentFilePath, previewHtml: buildPreviewHTML(updated) });
+  },
+
   async upsertFile(path, contents) {
     const state = get();
     if (!state.current) throw new Error("No project open");
@@ -170,7 +197,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     const files = state.current.files.filter((f) => f.path !== path);
     const updated: Project = { ...state.current, files };
     await putProject({ id: updated.id, data: updated });
-    set({ current: updated, previewHtml: buildPreviewHTML(updated) });
+    set({ current: updated, previewHtml: buildPreviewHTML(updated), currentFilePath: state.currentFilePath === path ? undefined : state.currentFilePath });
   },
 
   async snapshot(label) {
@@ -181,6 +208,16 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     await putProject({ id: updated.id, data: updated });
     set({ current: updated });
     return snap;
+  },
+
+  async restoreSnapshot(id) {
+    const state = get();
+    if (!state.current) throw new Error("No project open");
+    const snap = state.current.snapshots.find((s) => s.id === id);
+    if (!snap) throw new Error("Snapshot not found");
+    const updated: Project = { ...state.current, files: snap.files.map((f) => ({ ...f })), snapshots: state.current.snapshots };
+    await putProject({ id: updated.id, data: updated });
+    set({ current: updated, previewHtml: buildPreviewHTML(updated) });
   },
 
   stageDiff(path, after) {
