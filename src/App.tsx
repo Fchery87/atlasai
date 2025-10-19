@@ -25,11 +25,36 @@ function Header() {
 }
 
 function EditorPanel() {
-  const [code, setCode] = React.useState<string>("// Start coding...\n");
+  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock } = useProjectStore();
+  const file = current?.files.find((f) => f.path === currentFilePath);
+  const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
+
+  React.useEffect(() => {
+    setCode(file?.contents ?? "");
+  }, [currentFilePath, file?.contents]);
+
+  const canStage = !!currentFilePath;
+  const onStage = () => {
+    if (currentFilePath) stageDiff(currentFilePath, code);
+  };
+  const onSave = async () => {
+    if (currentFilePath) await upsertFile(currentFilePath, code);
+  };
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
-        <CardTitle>Editor (Monaco)</CardTitle>
+        <CardTitle>Editor (Monaco){currentFilePath ? ` — ${currentFilePath}` : ""}</CardTitle>
+        <div className="ml-auto flex items-center gap-2">
+          <Button onClick={onSave} disabled={!currentFilePath}>Save</Button>
+          <Button variant="secondary" onClick={onStage} disabled={!canStage}>Propose Change</Button>
+          {staged && (
+            <>
+              <Button onClick={approveDiff} disabled={fileLock}>Approve</Button>
+              <Button variant="ghost" onClick={rejectDiff}>Reject</Button>
+            </>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="p-0 grow min-h-[200px]">
         <Editor
@@ -45,18 +70,29 @@ function EditorPanel() {
 }
 
 function DiffPanel() {
-  const [before] = React.useState<string>("const a = 1;\n");
-  const [after] = React.useState<string>("const a = 2;\n");
+  const { staged } = useProjectStore();
+  if (!staged) {
+    return (
+      <Card className="h-full flex flex-col">
+        <CardHeader className="justify-between">
+          <CardTitle>Diff</CardTitle>
+        </CardHeader>
+        <CardContent className="grow text-sm text-muted-foreground flex items-center justify-center min-h-[200px]">
+          No staged changes
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
-        <CardTitle>Diff (Stub)</CardTitle>
+        <CardTitle>Diff — {staged.path}</CardTitle>
       </CardHeader>
       <CardContent className="p-0 grow min-h-[200px]">
         <DiffEditor
           height="100%"
-          original={before}
-          modified={after}
+          original={staged.before}
+          modified={staged.after}
           options={{ readOnly: true, renderSideBySide: true, renderIndicators: true, fontSize: 13, minimap: { enabled: false } }}
         />
       </CardContent>
@@ -90,6 +126,31 @@ function ChatPanel() {
 }
 
 function PreviewPanel() {
+  const { previewHtml } = useProjectStore();
+  const { append } = useTerminalStore();
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  React.useEffect(() => {
+    const onMessage = (ev: MessageEvent) => {
+      const data = ev.data as any;
+      if (data && data.__bf_console) {
+        append(`[preview] ${data.type}: ${data.args.join(" ")}`);
+      } else if (data && data.__bf_pong) {
+        append(`[preview] pong ${new Date(data.ts).toLocaleTimeString()}`);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [append]);
+
+  React.useEffect(() => {
+    // Ping after load
+    const t = setTimeout(() => {
+      iframeRef.current?.contentWindow?.postMessage({ __bf_ping: true }, "*");
+    }, 300);
+    return () => clearTimeout(t);
+  }, [previewHtml]);
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
@@ -97,10 +158,12 @@ function PreviewPanel() {
       </CardHeader>
       <CardContent className="grow p-0">
         <iframe
+          ref={iframeRef}
           title="Preview"
           className="w-full h-full"
           sandbox="allow-scripts allow-downloads"
           referrerPolicy="no-referrer"
+          srcDoc={previewHtml}
         />
       </CardContent>
     </Card>
@@ -108,13 +171,13 @@ function PreviewPanel() {
 }
 
 function TerminalPanel() {
-  const [lines, setLines] = React.useState<string[]>(["$ Ready"]);
+  const { lines, clear } = useTerminalStore();
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
         <CardTitle>Terminal</CardTitle>
         <div className="ml-auto flex gap-2">
-          <Button variant="secondary" onClick={() => setLines(["$ Cleared"])} aria-label="Clear terminal">Clear</Button>
+          <Button variant="secondary" onClick={clear} aria-label="Clear terminal">Clear</Button>
         </div>
       </CardHeader>
       <CardContent className="grow">
@@ -189,6 +252,10 @@ function QuickActions() {
   );
 }
 
+import { FileTree } from "./features/files/FileTree";
+import { SearchBar } from "./features/search/SearchBar";
+import { useTerminalStore } from "./lib/store/terminalStore";
+
 export default function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -204,19 +271,25 @@ export default function App() {
             <CardContent><QuickActions /></CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Deploy</CardTitle></CardHeader>
-            <CardContent className="text-sm text-muted-foreground">GitHub Pages / Netlify / Vercel presets.</CardContent>
+            <CardHeader><CardTitle>Search</CardTitle></CardHeader>
+            <CardContent><SearchBar /></CardContent>
           </Card>
         </section>
-        <section aria-label="Workbench" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <section aria-label="Workbench" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle>Files</CardTitle></CardHeader>
+              <CardContent><FileTree /></CardContent>
+            </Card>
+            <TerminalPanel />
+          </div>
+          <div className="space-y-4 lg:col-span-1">
             <EditorPanel />
             <DiffPanel />
           </div>
-          <div className="space-y-4">
+          <div className="space-y-4 lg:col-span-1">
             <ChatPanel />
             <PreviewPanel />
-            <TerminalPanel />
           </div>
         </section>
       </main>
