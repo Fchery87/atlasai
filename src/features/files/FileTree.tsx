@@ -37,6 +37,38 @@ function buildTree(paths: string[]): Node[] {
   return toNodes(root, "");
 }
 
+function hilite(text: string, q: string) {
+  if (!q) return text;
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return text;
+  const before = text.slice(0, idx);
+  const match = text.slice(idx, idx + q.length);
+  const after = text.slice(idx + q.length);
+  return (
+    <>
+      {before}
+      <mark>{match}</mark>
+      {after}
+    </>
+  );
+}
+
+function filterNodes(nodes: Node[], q: string): Node[] {
+  if (!q.trim()) return nodes;
+  const out: Node[] = [];
+  for (const n of nodes) {
+    if (n.type === "file") {
+      if (n.name.toLowerCase().includes(q.toLowerCase())) out.push(n);
+    } else {
+      const kids = filterNodes(n.children, q);
+      if (n.name.toLowerCase().includes(q.toLowerCase()) || kids.length) {
+        out.push({ ...n, children: kids });
+      }
+    }
+  }
+  return out;
+}
+
 export function FileTree() {
   const { current, selectFile, currentFilePath, deleteFile, snapshot, createFile, renameFile } = useProjectStore();
   const files = current?.files ?? [];
@@ -54,6 +86,8 @@ export function FileTree() {
       return {};
     }
   });
+
+  const [q, setQ] = React.useState("");
 
   React.useEffect(() => {
     localStorage.setItem("bf_tree_open", JSON.stringify(open));
@@ -131,7 +165,32 @@ export function FileTree() {
     }
   };
 
-  const tree = buildTree(files.map((f) => f.path));
+  const fullTree = buildTree(files.map((f) => f.path));
+  const tree = filterNodes(fullTree, q);
+
+  // Expand folders that include matches
+  React.useEffect(() => {
+    if (!q.trim()) return;
+    const expandPaths = (nodes: Node[]) => {
+      nodes.forEach((n) => {
+        if (n.type === "folder") {
+          if (n.children.length > 0 || n.name.toLowerCase().includes(q.toLowerCase())) {
+            setOpen((o) => ({ ...o, [n.path]: true }));
+            expandPaths(n.children);
+          }
+        }
+      });
+    };
+    expandPaths(tree);
+  }, [q, JSON.stringify(tree)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Context menu for folders
+  const [menu, setMenu] = React.useState<{ x: number; y: number; path: string } | null>(null);
+  React.useEffect(() => {
+    const onClick = () => setMenu(null);
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, []);
 
   const renderNode = (node: Node) => {
     if (node.type === "file") {
@@ -155,7 +214,7 @@ export function FileTree() {
               className={`text-left flex-1 rounded px-2 py-1 hover:bg-muted ${currentFilePath === node.path ? "bg-muted" : ""}`}
               aria-label={`Open ${node.path}`}
             >
-              {node.name}
+              {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}
             </button>
           )}
           <div className="flex items-center gap-1">
@@ -177,9 +236,13 @@ export function FileTree() {
           <button
             className="text-left flex-1 rounded px-2 py-1 hover:bg-muted"
             onClick={() => setOpen((o) => ({ ...o, [node.path]: !isOpen }))}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu({ x: e.clientX, y: e.clientY, path: node.path });
+            }}
             aria-label={`Toggle ${node.name}`}
           >
-            {isOpen ? "📂" : "📁"} {node.name}
+            {isOpen ? "📂" : "📁"} {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}
           </button>
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" aria-label={`New in ${node.path}`} onClick={() => startCreate(node.path + "/")}>
@@ -202,6 +265,15 @@ export function FileTree() {
           <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot">Snapshot</Button>
         </div>
       </div>
+      <div className="mb-2">
+        <input
+          aria-label="Filter files"
+          className="w-full h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          placeholder="Quick-jump filter..."
+          value={q}
+          onChange={(e) => setQ(e.currentTarget.value)}
+        />
+      </div>
       <ul className="space-y-1">
         {creating && (
           <li className="flex items-center gap-2">
@@ -223,6 +295,32 @@ export function FileTree() {
         )}
         {tree.length > 0 ? tree.map(renderNode) : !creating && <li className="text-muted-foreground">No files yet</li>}
       </ul>
+      {menu && (
+        <div
+          className="fixed z-50 rounded-md border bg-card shadow-lg text-sm"
+          style={{ left: menu.x, top: menu.y }}
+          role="menu"
+        >
+          <button
+            className="block w-full text-left px-3 py-2 hover:bg-muted"
+            onClick={() => {
+              startCreate(menu.path + "/");
+              setMenu(null);
+            }}
+          >
+            New file here
+          </button>
+          <button
+            className="block w-full text-left px-3 py-2 hover:bg-muted"
+            onClick={() => {
+              startCreate(menu.path + "/");
+              setMenu(null);
+            }}
+          >
+            New folder here
+          </button>
+        </div>
+      )}
     </div>
   );
 }
