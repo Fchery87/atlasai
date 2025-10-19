@@ -332,6 +332,8 @@ import { SearchBar } from "./features/search/SearchBar";
 import { useTerminalStore } from "./lib/store/terminalStore";
 import { SnapshotList } from "./features/snapshots/SnapshotList";
 import { CommandPalette, useCommandPalette } from "./features/commands/CommandPalette";
+import { GitPanel } from "./features/git/GitPanel";
+import { DeployPanel } from "./features/deploy/DeployPanel";
 
 export default function App() {
   const { open, setOpen } = useCommandPalette();
@@ -351,6 +353,16 @@ export default function App() {
           <Card>
             <CardHeader><CardTitle>Search</CardTitle></CardHeader>
             <CardContent><SearchBar /></CardContent>
+          </Card>
+        </section>
+        <section aria-label="Integrations" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <Card>
+            <CardHeader><CardTitle>Git</CardTitle></CardHeader>
+            <CardContent><GitPanel /></CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Deploy</CardTitle></CardHeader>
+            <CardContent><DeployPanel /></CardContent>
           </Card>
         </section>
         <section aria-label="Workbench" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
