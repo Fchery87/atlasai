@@ -13,10 +13,10 @@ Legend:
 ## 6) Functional Requirements
 
 ### 6.1 Prompt → Code
-- [~] Chat panel UI
-  - [ ] Model picker per message
+- [x] Chat panel UI
+  - [x] Model picker per message
   - [ ] Attachments (images/files)
-  - [~] Streaming responses (providers support streaming; chat UI not yet wired)
+  - [x] Streaming responses (wired to providers)
   - [ ] Token/cost estimate in header
   - [ ] Stop/undo controls
 - [x] Diff approval step for changes generated (manual and snapshot-driven)
@@ -35,8 +35,8 @@ Legend:
 - [x] Search across project
 - [x] Snapshots: create/list/preview diffs/selective apply/restore
 - [x] Project export/import ZIP
-- [~] Import from Git URL (UI scaffold)
-- [~] Push to GitHub (UI scaffold; requires OAuth worker wiring)
+- [x] Import from Git URL
+- [x] Push to GitHub (OAuth + contents/tree APIs, updates and deletes, .gitignore handling)
 
 ### 6.3 Run & Preview
 - [x] Terminal panel with bounded buffer and Clear
@@ -50,21 +50,24 @@ Legend:
 - [x] Provider Manager UI with key validate/save/clear (encrypted WebCrypto)
 - [x] OpenRouter adapter
 - [x] Ollama adapter
-- [ ] Groq adapter
-- [ ] Anthropic Claude Code adapter
-- [ ] GPT‑5 Codex placeholder adapter
+- [x] Groq adapter
+- [x] Anthropic Claude Code adapter
+- [x] GPT‑5 Codex placeholder adapter
 - [ ] Custom provider form (from schema)
-- [~] Credentials stored client-side encrypted; optional sync via OAuth not implemented
+- [x] Credentials stored client-side encrypted; optional sync via OAuth not implemented
 
 ### 6.5 Deploy
-- [~] Presets for GitHub Pages / Netlify / Vercel (UI scaffold, status area)
-- [ ] Provider-specific deploy flows and build logs
+- [x] Presets for GitHub Pages / Netlify / Vercel (UI + status/logs)
+- [x] Provider-specific deploy flows and logs
+  - GitHub Pages: upload to gh-pages; CI workflow provided
+  - Netlify: hash-based incremental uploads
+  - Vercel: project linking + config, then deployment request
 - [ ] SPA routing guidance and steps
 
 ## 7) Nonfunctional Requirements
 - [~] Performance: lazy Monaco; Prettier parsers lazy; further profiling TBD
 - [x] Reliability: snapshots; local IndexedDB persistence
-- [x] Accessibility (WCAG 2.1 AA): ARIA labels; keyboard-first flows; Axe E2E check added
+- [x] Accessibility (WCAG 2.1 AA): ARIA labels; keyboard-first flows; Axe E2E checks across core interactions
 - [x] Privacy: BYOK only; encrypted storage; no server secrets by default
 - [x] Cost: $0 infra default
 
@@ -80,20 +83,22 @@ Legend:
 
 ## 10) Backend Architecture & Quality Specifications
 - [x] Storage: IndexedDB projects, encrypted localStorage for provider keys
-- [~] Serverless Worker scaffold (OAuth callback handler skeleton)
-- [ ] Deploy status polling endpoint
+- [x] Serverless Worker: GitHub OAuth code exchange (PKCE) with CORS
+- [x] Deploy status polling endpoint
 - [ ] Optional LLM relay (BYOK-forwarding) with rate-limiting and scrubbing
 
 ## 12) CI/CD & Quality
 - [x] GitHub Actions CI: typecheck, lint, unit tests, build, Playwright E2E
+- [x] GitHub Pages workflow: build and deploy dist/ to Pages
 - [ ] Security scanning: npm audit/OSV/dep check on PRs
 - [ ] Precommit hooks: lint-staged + prettier
 - [ ] Release: tag + changelog; Pages/Workers deploy via Actions
 
 ## 13) TDD Strategy
 - [x] Unit: crypto keys test, project store diffs/snapshots
-- [x] Unit: provider adapter tests (existing)
-- [x] E2E: smoke test; Axe accessibility test added
+- [x] Unit: provider adapter tests (existing + new providers)
+- [x] Unit: deploy and git helpers (zip pack, sha1, delete calc)
+- [x] E2E: smoke test; Axe accessibility tests on home, palette, snapshots, integrations
 - [ ] E2E: Prompt→Diff→Apply→Preview flow
 - [ ] Contract tests: ProviderAdapter compliance suite
 
@@ -113,32 +118,31 @@ Phase 1 (Run & Diff)
 - [x] Accessibility polish; keyboard shortcuts; Axe CI
 
 Phase 2 (Git & Deploy)
-- [~] GitHub OAuth Worker scaffold
-- [~] Git import/push UI scaffold
-- [~] Deploy presets UI scaffold
-- [ ] Wire OAuth + GitHub push/import
-- [ ] Implement deploy flows with logs
+- [x] GitHub OAuth Worker exchange (PKCE)
+- [x] Git import/push (with deletes, .gitignore, encrypted config)
+- [x] Deploy presets (GH Pages, Netlify hash-based, Vercel link+config) with logs
+- [x] GH Pages CI workflow
+- [x] Deploy status polling endpoint (optional)
 
 Phase 3 (LLM Extensibility)
-- [ ] Additional providers (Groq, Anthropic Claude Code, GPT‑5 placeholder)
+- [x] Additional providers (Groq, Anthropic Claude Code, GPT‑5 placeholder)
 - [ ] Custom provider form w/ zod schema validation
 
 Phase 4 (Polish & Desktop)
 - [ ] Resizable split panes with persistence
-- [ ] Command palette (completed)  ✅
+- [x] Command palette
 - [ ] Offline caching / PWA
 - [ ] Optional Electron packaging
 
 ## 17) Acceptance Criteria (MVP)
 - [~] Create project → edit file → run preview → apply AI change → see diff → deploy to GH Pages
-  - Current status: All except “apply AI change” (chat→diff) wiring and deploy flow.
-- [~] Add provider via UI; validate key; use it in a chat that edits code
-  - Current status: Provider add/validate done; chat integration not wired.
-- [x] Critical flows keyboard-navigable; Axe checks pass for main screen
+  - Current status: Chat can stream and stage diffs; manual approve applies; GH Pages deploy workflow present. Add E2E to demarcate end-to-end.
+- [x] Add provider via UI; validate key; use it in a chat that edits code
+- [x] Critical flows keyboard-navigable; Axe checks pass for main screen and key interactions
 - [x] No server-side secret storage by default
 
 ## Summary
 - Phase 0 and Phase 1: COMPLETE.
-- Phase 2: Scaffolds in place; needs OAuth wiring, Git import/push, and deploy flows.
-- Provider extensibility (Phase 3): Pending.
-- Remaining polish: Split panes, templates gallery, security scanning in CI, precommit hooks, full E2E flows.
+- Phase 2: COMPLETE (OAuth exchange, Git import/push, deploy flows, GH Pages CI, optional deploy-status polling worker and UI).
+- Phase 3: Additional providers integrated; custom provider form pending.
+- Remaining polish: Split panes, templates gallery, security scanning in CI, precommit hooks, full E2E Prompt→Diff→Apply flow, custom provider schema form.

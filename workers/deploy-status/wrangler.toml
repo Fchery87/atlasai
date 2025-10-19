@@ -1,0 +1,6 @@
+name = "deploy-status"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+
+[vars]
+# No secrets stored; tokens are passed per-request via Authorization headers

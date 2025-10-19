@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
+import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
 type Node = { type: "folder"; name: string; path: string; children: Node[] } | { type: "file"; name: string; path: string };
 
@@ -73,9 +74,27 @@ function filterNodes(nodes: Node[], q: string): Node[] {
 
 export function FileTree() {
   const { current, selectFile, currentFilePath, deleteFile, snapshot, createFile, renameFile } = useProjectStore();
+  const pid = current?.id;
   const files = current?.files ?? [];
   const [renaming, setRenaming] = React.useState<string | null>(null);
   const renameInputRef = React.useRef<HTMLInputElement>(null);
+  const [showHelp, setShowHelp] = React.useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      const v = await loadDecrypted(pid ? `sec_help_files:${pid}` : "sec_help_files");
+      setShowHelp(v === "1");
+    })();
+  }, [pid]);
+  React.useEffect(() => {
+    saveEncrypted(pid ? `sec_help_files:${pid}` : "sec_help_files", showHelp ? "1" : "0");
+  }, [showHelp, pid]);
+
+  React.useEffect(() => {
+    const onReset = () => setShowHelp(false);
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+  }, []);
 
   const [creating, setCreating] = React.useState<boolean>(false);
   const [creatingPath, setCreatingPath] = React.useState<string | null>(null); // "" for top-level, or folder path
@@ -472,7 +491,22 @@ export function FileTree() {
       aria-label="File tree"
     >
       <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold">Files</div>
+        <div className="font-semibold flex items-center gap-2">
+          Files
+          <Button variant="ghost" size="sm" onClick={() => setShowHelp(v => !v)} aria-label="Files help">?</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem(pid ? `sec_help_files:${pid}` : "sec_help_files");
+              setShowHelp(false);
+            }}
+            aria-label="Reset Files UI tips"
+            title="Reset Files UI tips"
+          >
+            Reset UI Tips
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
           {selected.size > 0 ? (
             <>
@@ -506,6 +540,13 @@ export function FileTree() {
           )}
         </div>
       </div>
+      {showHelp && (
+        <div className="text-xs text-muted-foreground border rounded-md p-2 mb-2">
+          - Use New to create files; end with “/” to create a folder placeholder (.keep).<br />
+          - Right-click a folder for context actions (new here, delete empty).<br />
+          - Multi-select with Shift/Ctrl/Cmd or drag to select; use Delete Selected.
+        </div>
+      )}
       <div className="mb-2">
         <input
           aria-label="Filter files"

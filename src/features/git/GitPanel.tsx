@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
 import { startGitHubOAuth, completeGitHubOAuth, getGitHubToken, clearGitHubToken, saveGitHubClientConfig, loadGitHubClientConfig } from "../../lib/oauth/github";
+import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
@@ -20,19 +21,37 @@ export function GitPanel() {
   const [repoUrl, setRepoUrl] = React.useState("");
   const [branch, setBranch] = React.useState("main");
   const [status, setStatus] = React.useState("Idle");
+  const pid = useProjectStore().current?.id;
   const [ghClientId, setGhClientId] = React.useState<string>("");
   const [workerUrl, setWorkerUrl] = React.useState<string>("");
   const [token, setToken] = React.useState<string | null>(null);
+  const [showHelp, setShowHelp] = React.useState(false);
 
   React.useEffect(() => {
-    // Load encrypted config and token
+    // Load encrypted config, token, and default branch for this project
     (async () => {
       const cfg = await loadGitHubClientConfig();
       if (cfg.clientId) setGhClientId(cfg.clientId);
       if (cfg.workerUrl) setWorkerUrl(cfg.workerUrl);
       const t = await getGitHubToken();
       setToken(t);
+      const defBranch = (await loadDecrypted(pid ? `sec_default_branch:${pid}` : "sec_default_branch")) || "main";
+      setBranch(defBranch);
+      const savedBranch = (await loadDecrypted(pid ? `sec_git_branch:${pid}` : "sec_git_branch")) || undefined;
+      if (savedBranch) setBranch(savedBranch);
+      const help = await loadDecrypted(pid ? `sec_help_git:${pid}` : "sec_help_git");
+      setShowHelp(help === "1");
     })();
+  }, [pid]);
+
+  React.useEffect(() => {
+    saveEncrypted(pid ? `sec_help_git:${pid}` : "sec_help_git", showHelp ? "1" : "0");
+  }, [showHelp, pid]);
+
+  React.useEffect(() => {
+    const onReset = () => setShowHelp(false);
+    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
+    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
   }, []);
 
   React.useEffect(() => {
@@ -176,6 +195,31 @@ export function GitPanel() {
 
   return (
     <div className="space-y-2 text-sm">
+      <div className="flex items-center justify-between">
+        <div className="font-medium">Git</div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowHelp(v => !v)} aria-label="Git help">?</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem(pid ? `sec_help_git:${pid}` : "sec_help_git");
+              setShowHelp(false);
+            }}
+            aria-label="Reset Git UI tips"
+            title="Reset Git UI tips"
+          >
+            Reset UI Tips
+          </Button>
+        </div>
+      </div>
+      {showHelp && (
+        <div className="text-xs text-muted-foreground border rounded-md p-2">
+          - Sign in using your GitHub OAuth Client ID and Worker URL (kept client-side).<br />
+          - Import from a Git URL to seed a project; Push syncs local files to the selected branch.<br />
+          - Push will create/update files and delete those missing locally (excluding .git paths).
+        </div>
+      )}
       <div className="flex gap-2 items-center">
         <input
           className="flex-1 h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -213,7 +257,12 @@ export function GitPanel() {
           placeholder="branch"
           aria-label="Branch"
           value={branch}
-          onChange={(e) => setBranch(e.currentTarget.value)}
+          onChange={(e) => {
+            const v = e.currentTarget.value;
+            setBranch(v);
+            if (v) saveEncrypted(pid ? `sec_git_branch:${pid}` : "sec_git_branch", v);
+          }}
+          title="Defaulted from project default branch"
         />
         <Button variant="secondary" onClick={pushRepo} aria-label="Push changes">Push</Button>
       </div>

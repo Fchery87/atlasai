@@ -7,6 +7,7 @@ import Editor, { DiffEditor } from "@monaco-editor/react";
 import { useProjectStore } from "./lib/store/projectStore";
 import { languageFromPath } from "./lib/editor/lang";
 import { useDebounced } from "./lib/hooks/useDebounced";
+import { SplitPane } from "./components/layout/SplitPane";
 
 function Header() {
   const { current } = useProjectStore();
@@ -18,6 +19,25 @@ function Header() {
           BoltForge {current ? `/ ${current.name}` : ""}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            title="Reset all UI tips across the app"
+            aria-label="Reset all UI tips"
+            onClick={() => {
+              const toRemove: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i) || "";
+                if (k.startsWith("sec_help_") || k.startsWith("sec_hide_dist_banner")) {
+                  toRemove.push(k);
+                }
+              }
+              toRemove.forEach((k) => localStorage.removeItem(k));
+              // Notify panels to refresh their local UI tip states immediately
+              window.dispatchEvent(new CustomEvent("bf:reset-ui-tips"));
+            }}
+          >
+            Reset All UI Tips
+          </Button>
           <Button variant="secondary">Save</Button>
           <Button>Run</Button>
         </div>
@@ -176,25 +196,377 @@ function DiffPanel() {
 }
 
 function ChatPanel() {
+  const { current, currentFilePath, stageDiff } = useProjectStore();
   const [prompt, setPrompt] = React.useState("");
+  const [providerId, setProviderId] = React.useState<string>("openrouter");
+  const [model, setModel] = React.useState<string>("");
+  const [streaming, setStreaming] = React.useState(false);
+  const [output, setOutput] = React.useState("");
+  const [targetPath, setTargetPath] = React.useState<string>(currentFilePath || "index.html");
+  const [status, setStatus] = React.useState<string>("");
+  const [useContextFile, setUseContextFile] = React.useState<boolean>(true);
+  const [useTargetCurrentFile, setUseTargetCurrentFile] = React.useState<boolean>(true);
+  const [maxContextChars, setMaxContextChars] = React.useState<number>(4000);
+  const [contextExpanded, setContextExpanded] = React.useState<boolean>(false);
+  const [attachments, setAttachments] = React.useState<Array<{ name: string; type: string; size: number; text?: string; note?: string }>>([]);
+  const [maxAttachmentChars, setMaxAttachmentChars] = React.useState<number>(8000);
+  const [includeImagesAsDataUrl, setIncludeImagesAsDataUrl] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (currentFilePath) {
+      if (useTargetCurrentFile) setTargetPath(currentFilePath);
+    }
+  }, [currentFilePath, useTargetCurrentFile]);
+
+  type AdapterBundle = {
+    def: import("./lib/providers/types").ProviderDefinition;
+    adapter: import("./lib/providers/types").ProviderAdapter;
+    needsKey: boolean;
+  };
+
+  const registry: Record<string, AdapterBundle> = React.useMemo(() => {
+    const { OpenRouterDef, OpenRouterAdapter } = require("./lib/providers/openrouter");
+    const { OllamaDef, OllamaAdapter } = require("./lib/providers/ollama");
+    const { GroqDef, GroqAdapter } = require("./lib/providers/groq");
+    const { AnthropicDef, AnthropicAdapter } = require("./lib/providers/anthropic");
+    const { GPT5Def, GPT5Adapter } = require("./lib/providers/gpt5");
+    return {
+      openrouter: { def: OpenRouterDef, adapter: OpenRouterAdapter, needsKey: true },
+      ollama: { def: OllamaDef, adapter: OllamaAdapter, needsKey: false },
+      groq: { def: GroqDef, adapter: GroqAdapter, needsKey: true },
+      anthropic: { def: AnthropicDef, adapter: AnthropicAdapter, needsKey: true },
+      gpt5: { def: GPT5Def, adapter: GPT5Adapter, needsKey: false },
+    };
+  }, []);
+
+  const providerCaps = React.useMemo(() => {
+    const bundle = registry[providerId];
+    return bundle ? bundle.adapter.capabilities(bundle.def) : { vision: false, tools: false };
+  }, [registry, providerId]);
+
+  const modelsForProvider = React.useMemo(() => {
+    const bundle = registry[providerId];
+    return bundle?.def.models?.map((m: any) => m.id) ?? [];
+  }, [registry, providerId]);
+
+  React.useEffect(() => {
+    if (!modelsForProvider.includes(model)) {
+      setModel(modelsForProvider[0] || "");
+    }
+  }, [modelsForProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentFileContent = React.useMemo(() => {
+    if (!current || !currentFilePath) return "";
+    return current.files.find((f) => f.path === currentFilePath)?.contents ?? "";
+  }, [current, currentFilePath]);
+
+  const buildMessages = (): Array<{ role: "system" | "user" | "assistant"; content: string }> => {
+    const msgs: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+    let sys = "";
+    if (useContextFile && currentFilePath && currentFileContent) {
+      const full = currentFileContent;
+      const needsTruncate = !contextExpanded && full.length > maxContextChars;
+      const slice = needsTruncate ? full.slice(0, Math.max(0, maxContextChars)) : full;
+      const note = needsTruncate ? `\n\n[context truncated to ${slice.length} of ${full.length} chars]` : "";
+      sys +=
+        `You are a coding assistant. The user is working on file ${currentFilePath} and wants to update ${targetPath}.\n` +
+        `Here is the current content of ${currentFilePath}:${note}\n` +
+        "```text\n" + slice + "\n```";
+    }
+    if (attachments.length) {
+      const parts: string[] = [];
+      for (const a of attachments) {
+        if (a.text) {
+          parts.push(`Attachment ${a.name} (${a.type}, ${a.size} bytes):\n\`\`\`text\n${a.text}\n\`\`\``);
+        } else {
+          parts.push(`Attachment ${a.name} (${a.type}, ${a.size} bytes) included (binary or image omitted). ${a.note ?? ""}`.trim());
+        }
+      }
+      sys += (sys ? "\n\n" : "") + parts.join("\n\n");
+    }
+    if (sys) msgs.push({ role: "system", content: sys });
+    msgs.push({ role: "user", content: prompt });
+    return msgs;
+  };
+
+  const send = async () => {
+    const bundle = registry[providerId];
+    if (!bundle) return;
+    setStreaming(true);
+    setOutput("");
+    setStatus("Starting...");
+    let key = "";
+    if (bundle.needsKey) {
+      const { loadProviderKey } = await import("./lib/crypto/keys");
+      const k = await loadProviderKey(bundle.def.id);
+      if (!k.plaintext) {
+        setStatus("Missing API key for provider");
+        setStreaming(false);
+        return;
+      }
+      key = k.plaintext;
+    }
+    try {
+      const payload = {
+        model: model || (bundle.def.models[0]?.id ?? ""),
+        messages: buildMessages(),
+      };
+      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload)) {
+        if (chunk.type === "text") {
+          setOutput((prev) => prev + chunk.data);
+        } else {
+          setStatus(chunk.data);
+        }
+      }
+      setStatus("Done");
+    } catch (e: any) {
+      setStatus(e?.message ?? "Stream failed");
+    } finally {
+      setStreaming(false);
+    }
+  };
+
+  // Basic Markdown renderer with code block copy support
+  function renderMarkdown(md: string) {
+    const parts: Array<{ type: "code" | "text"; lang?: string; content: string }> = [];
+    const regex = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(md)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ type: "text", content: md.slice(lastIndex, match.index) });
+      }
+      parts.push({ type: "code", lang: match[1] || "text", content: match[2] });
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < md.length) {
+      parts.push({ type: "text", content: md.slice(lastIndex) });
+    }
+    return (
+      <div className="space-y-2">
+        {parts.map((p, i) =>
+          p.type === "code" ? (
+            <div key={i} className="border rounded-md overflow-hidden">
+              <div className="flex items-center justify-between px-2 py-1 bg-muted text-xs">
+                <span>{p.lang}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigator.clipboard.writeText(p.content)}
+                  aria-label="Copy code"
+                  title="Copy code"
+                >
+                  Copy
+                </Button>
+              </div>
+              <pre className="p-2 text-xs overflow-auto"><code>{p.content}</code></pre>
+            </div>
+          ) : (
+            <div key={i} className="text-sm whitespace-pre-wrap">{p.content}</div>
+          )
+        )}
+      </div>
+    );
+  }
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
         <CardTitle>Chat</CardTitle>
       </CardHeader>
-      <CardContent className="grow flex flex-col">
-        <div className="flex-1 text-sm text-muted-foreground">Assistant stream will appear here.</div>
-        <Separator className="my-2" />
-        <form className="flex gap-2" aria-label="Prompt input" onSubmit={(e) => e.preventDefault()}>
+      <CardContent className="grow flex flex-col gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+          <label className="text-xs">
+            Provider
+            <select
+              className="mt-1 w-full h-8 rounded-md border border-input px-2 text-sm"
+              aria-label="Provider"
+              value={providerId}
+              onChange={(e) => setProviderId(e.currentTarget.value)}
+            >
+              {Object.keys(registry).map((id) => (
+                <option key={id} value={id}>{registry[id].def.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs md:col-span-2">
+            Model
+            <select
+              className="mt-1 w-full h-8 rounded-md border border-input px-2 text-sm"
+              aria-label="Model"
+              value={model}
+              onChange={(e) => setModel(e.currentTarget.value)}
+            >
+              {modelsForProvider.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+          <div className="flex items-center gap-3">
+            <label className="text-xs flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useContextFile}
+                onChange={(e) => setUseContextFile(e.currentTarget.checked)}
+                aria-label="Use selected file as context"
+              />
+              Use selected file as context
+            </label>
+            <label className="text-xs flex items-center gap-1" title="Maximum characters from the context file to include">
+              <span>Max ctx</span>
+              <input
+                className="h-7 w-20 rounded-md border border-input px-2 text-xs"
+                type="number"
+                min={500}
+                step={500}
+                value={maxContextChars}
+                onChange={(e) => setMaxContextChars(Math.max(0, Number(e.currentTarget.value || 0)))}
+                aria-label="Max context characters"
+              />
+            </label>
+            {useContextFile && currentFileContent.length > maxContextChars && !contextExpanded && (
+              <Button variant="ghost" size="sm" onClick={() => setContextExpanded(true)} aria-label="Show full context">Show full</Button>
+            )}
+            {useContextFile && contextExpanded && currentFileContent.length > maxContextChars && (
+              <Button variant="ghost" size="sm" onClick={() => setContextExpanded(false)} aria-label="Show less context">Show less</Button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useTargetCurrentFile}
+                onChange={(e) => setUseTargetCurrentFile(e.currentTarget.checked)}
+                aria-label="Use current file as target"
+              />
+              Use current file as target
+            </label>
+          </div>
+          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">{status}</div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              aria-label="Prompt"
+              className="flex-1 h-10 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              placeholder="Ask to edit code..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.currentTarget.value)}
+            />
+            <Button onClick={send} disabled={!prompt.trim() || streaming} aria-label="Send">
+              {streaming ? "Streaming..." : "Send"}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="Attach files"
+              type="file"
+              multiple
+              accept=""
+              onChange={async (e) => {
+                const files = Array.from(e.currentTarget.files || []);
+                const newItems: Array<{ name: string; type: string; size: number; text?: string; note?: string }> = [];
+                for (const f of files) {
+                  const isImage = f.type.startsWith("image/");
+                  const isText = f.type.startsWith("text/") || [".js",".ts",".tsx",".jsx",".json",".css",".html",".md",".yml",".yaml",".py",".sh",".bash"].some(ext => f.name.endsWith(ext));
+                  if (isText) {
+                    const txt = await f.text();
+                    const sliced = txt.slice(0, maxAttachmentChars);
+                    const note = txt.length > maxAttachmentChars ? `truncated to ${sliced.length} of ${txt.length} chars` : undefined;
+                    newItems.push({ name: f.name, type: f.type || "text/plain", size: f.size, text: sliced, note });
+                  } else if (isImage && includeImagesAsDataUrl && providerCaps.vision) {
+                    const buf = await new Promise<string>((resolve) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result as string);
+                      reader.readAsDataURL(f);
+                    });
+                    newItems.push({ name: f.name, type: f.type || "image/*", size: f.size, text: buf, note: "included as data URL" });
+                  } else {
+                    newItems.push({ name: f.name, type: f.type || "application/octet-stream", size: f.size, note: "binary/image omitted" });
+                  }
+                }
+                setAttachments(prev => [...prev, ...newItems]);
+                // reset
+                (e.target as HTMLInputElement).value = "";
+              }}
+            />
+            <label className="text-xs flex items-center gap-1" title="Max characters read from each text attachment">
+              <span>Max attach</span>
+              <input
+                className="h-7 w-20 rounded-md border border-input px-2 text-xs"
+                type="number"
+                min={1000}
+                step={1000}
+                value={maxAttachmentChars}
+                onChange={(e) => setMaxAttachmentChars(Math.max(0, Number(e.currentTarget.value || 0)))}
+                aria-label="Max attachment characters"
+              />
+            </label>
+            <label className="text-xs flex items-center gap-2" title={providerCaps.vision ? "Include images as data URLs" : "Provider does not support vision"}>
+              <input
+                type="checkbox"
+                checked={includeImagesAsDataUrl}
+                onChange={(e) => setIncludeImagesAsDataUrl(e.currentTarget.checked)}
+                disabled={!providerCaps.vision}
+                aria-label="Include images as data URLs"
+              />
+              Include images
+            </label>
+            {attachments.length > 0 && (
+              <Button variant="ghost" size="sm" aria-label="Clear attachments" onClick={() => setAttachments([])}>Clear attachments</Button>
+            )}
+          </div>
+          {attachments.length > 0 && (
+            <div className="text-xs border rounded-md p-2 max-h-28 overflow-auto">
+              <div className="font-medium mb-1">Attachments</div>
+              <ul className="space-y-1">
+                {attachments.map((a, idx) => (
+                  <li key={idx} className="flex items-center justify-between gap-2">
+                    <div className="truncate">
+                      {a.name} <span className="text-muted-foreground">({a.type || "unknown"}, {a.size} bytes{a.note ? `, ${a.note}` : ""})</span>
+                    </div>
+                    <Button variant="ghost" size="sm" aria-label={`Remove ${a.name}`} onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}>Remove</Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <Separator className="my-1" />
+        <div className="text-xs font-medium">Assistant output (editable)</div>
+        <textarea
+          aria-label="Assistant output"
+          className="w-full min-h-[120px] rounded-md border border-input p-2 text-sm font-mono"
+          value={output}
+          onChange={(e) => setOutput(e.currentTarget.value)}
+          placeholder="Model output will appear here..."
+        />
+        <div className="text-xs font-medium mt-1">Rendered preview</div>
+        <div className="border rounded-md p-2 max-h-56 overflow-auto">
+          {output ? renderMarkdown(output) : <div className="text-xs text-muted-foreground">No output yet</div>}
+        </div>
+        <div className="flex items-center gap-2">
           <input
-            aria-label="Prompt"
-            className="flex-1 h-10 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            placeholder="Ask to edit code..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.currentTarget.value)}
+            className="h-9 rounded-md border border-input px-3 text-sm"
+            aria-label="Target file path"
+            placeholder="Target file path"
+            value={targetPath}
+            onChange={(e) => setTargetPath(e.currentTarget.value)}
+            disabled={useTargetCurrentFile}
+            title={useTargetCurrentFile ? "Using current file as target" : "Set a custom target file"}
           />
-          <Button type="submit" disabled={!prompt.trim()}>Send</Button>
-        </form>
+          <Button
+            variant="secondary"
+            onClick={() => targetPath && stageDiff(targetPath, output)}
+            disabled={!targetPath || !output}
+            title="Stage AI output as a change to the target file"
+          >
+            Stage to file
+          </Button>
+          <Button variant="ghost" onClick={() => setOutput("")} disabled={!output}>Clear</Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -365,26 +737,28 @@ export default function App() {
             <CardContent><DeployPanel /></CardContent>
           </Card>
         </section>
-        <section aria-label="Workbench" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader><CardTitle>Files</CardTitle></CardHeader>
-              <CardContent><FileTree /></CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Snapshots</CardTitle></CardHeader>
-              <CardContent><SnapshotList /></CardContent>
-            </Card>
-            <TerminalPanel />
-          </div>
-          <div className="space-y-4 lg:col-span-1">
-            <EditorPanel />
-            <DiffPanel />
-          </div>
-          <div className="space-y-4 lg:col-span-1">
-            <ChatPanel />
-            <PreviewPanel />
-          </div>
+        <section aria-label="Workbench" className="h-[70vh]">
+          <SplitPane dir="vertical" sizes={[26, 38, 36]} storageKey="bf_split_workbench">
+            <div className="pr-2 space-y-4">
+              <Card>
+                <CardHeader><CardTitle>Files</CardTitle></CardHeader>
+                <CardContent><FileTree /></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Snapshots</CardTitle></CardHeader>
+                <CardContent><SnapshotList /></CardContent>
+              </Card>
+              <TerminalPanel />
+            </div>
+            <div className="px-2 space-y-4">
+              <EditorPanel />
+              <DiffPanel />
+            </div>
+            <div className="pl-2 space-y-4">
+              <ChatPanel />
+              <PreviewPanel />
+            </div>
+          </SplitPane>
         </section>
       </main>
       <CommandPalette open={open} onClose={() => setOpen(false)} />
