@@ -735,6 +735,7 @@ import { SnapshotList } from "./features/snapshots/SnapshotList";
 import { CommandPalette, useCommandPalette } from "./features/commands/CommandPalette";
 import { GitPanel } from "./features/git/GitPanel";
 import { DeployPanel } from "./features/deploy/DeployPanel";
+import { TemplatesGallery } from "./features/templates/TemplatesGallery";
 
 export default function App() {
   const { open, setOpen } = useCommandPalette();
@@ -752,8 +753,8 @@ export default function App() {
             <CardContent><QuickActions /></CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Search</CardTitle></CardHeader>
-            <CardContent><SearchBar /></CardContent>
+            <CardHeader><CardTitle>Templates</CardTitle></CardHeader>
+            <CardContent><TemplatesGallery /></CardContent>
           </Card>
         </section>
         <section aria-label="Integrations" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
