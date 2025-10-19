@@ -195,7 +195,7 @@ function DiffPanel() {
 }
 
 function ChatPanel() {
-  const { currentFilePath, stageDiff } = useProjectStore();
+  const { current, currentFilePath, stageDiff } = useProjectStore();
   const [prompt, setPrompt] = React.useState("");
   const [providerId, setProviderId] = React.useState<string>("openrouter");
   const [model, setModel] = React.useState<string>("");
@@ -203,6 +203,7 @@ function ChatPanel() {
   const [output, setOutput] = React.useState("");
   const [targetPath, setTargetPath] = React.useState<string>(currentFilePath || "index.html");
   const [status, setStatus] = React.useState<string>("");
+  const [useContextFile, setUseContextFile] = React.useState<boolean>(true);
 
   React.useEffect(() => {
     if (currentFilePath) setTargetPath(currentFilePath);
@@ -240,6 +241,26 @@ function ChatPanel() {
     }
   }, [modelsForProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const currentFileContent = React.useMemo(() => {
+    if (!current || !currentFilePath) return "";
+    return current.files.find((f) => f.path === currentFilePath)?.contents ?? "";
+  }, [current, currentFilePath]);
+
+  const buildMessages = (): Array<{ role: "system" | "user" | "assistant"; content: string }> => {
+    const msgs: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+    if (useContextFile && currentFilePath && currentFileContent) {
+      msgs.push({
+        role: "system",
+        content:
+          `You are a coding assistant. The user is working on file ${currentFilePath} and wants to update ${targetPath}.\n` +
+          `Here is the current content of ${currentFilePath}:\n` +
+          "```text\n" + currentFileContent + "\n```",
+      });
+    }
+    msgs.push({ role: "user", content: prompt });
+    return msgs;
+  };
+
   const send = async () => {
     const bundle = registry[providerId];
     if (!bundle) return;
@@ -260,7 +281,7 @@ function ChatPanel() {
     try {
       const payload = {
         model: model || (bundle.def.models[0]?.id ?? ""),
-        messages: [{ role: "user" as const, content: prompt }],
+        messages: buildMessages(),
       };
       for await (const chunk of bundle.adapter.stream(bundle.def, key, payload)) {
         if (chunk.type === "text") {
@@ -276,6 +297,49 @@ function ChatPanel() {
       setStreaming(false);
     }
   };
+
+  // Basic Markdown renderer with code block copy support
+  function renderMarkdown(md: string) {
+    const parts: Array<{ type: "code" | "text"; lang?: string; content: string }> = [];
+    const regex = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(md)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ type: "text", content: md.slice(lastIndex, match.index) });
+      }
+      parts.push({ type: "code", lang: match[1] || "text", content: match[2] });
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < md.length) {
+      parts.push({ type: "text", content: md.slice(lastIndex) });
+    }
+    return (
+      <div className="space-y-2">
+        {parts.map((p, i) =>
+          p.type === "code" ? (
+            <div key={i} className="border rounded-md overflow-hidden">
+              <div className="flex items-center justify-between px-2 py-1 bg-muted text-xs">
+                <span>{p.lang}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigator.clipboard.writeText(p.content)}
+                  aria-label="Copy code"
+                  title="Copy code"
+                >
+                  Copy
+                </Button>
+              </div>
+              <pre className="p-2 text-xs overflow-auto"><code>{p.content}</code></pre>
+            </div>
+          ) : (
+            <div key={i} className="text-sm whitespace-pre-wrap">{p.content}</div>
+          )
+        )}
+      </div>
+    );
+  }
 
   return (
     <Card className="h-full flex flex-col">
@@ -311,6 +375,18 @@ function ChatPanel() {
             </select>
           </label>
         </div>
+        <div className="flex items-center justify-between">
+          <label className="text-xs flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={useContextFile}
+              onChange={(e) => setUseContextFile(e.currentTarget.checked)}
+              aria-label="Use selected file as context"
+            />
+            Use selected file as context
+          </label>
+          <div className="text-xs text-muted-foreground" aria-live="polite">{status}</div>
+        </div>
         <div className="flex gap-2">
           <input
             aria-label="Prompt"
@@ -323,9 +399,8 @@ function ChatPanel() {
             {streaming ? "Streaming..." : "Send"}
           </Button>
         </div>
-        <div className="text-xs text-muted-foreground" aria-live="polite">{status}</div>
         <Separator className="my-1" />
-        <div className="text-xs font-medium">Assistant output</div>
+        <div className="text-xs font-medium">Assistant output (editable)</div>
         <textarea
           aria-label="Assistant output"
           className="w-full min-h-[120px] rounded-md border border-input p-2 text-sm font-mono"
@@ -333,6 +408,10 @@ function ChatPanel() {
           onChange={(e) => setOutput(e.currentTarget.value)}
           placeholder="Model output will appear here..."
         />
+        <div className="text-xs font-medium mt-1">Rendered preview</div>
+        <div className="border rounded-md p-2 max-h-56 overflow-auto">
+          {output ? renderMarkdown(output) : <div className="text-xs text-muted-foreground">No output yet</div>}
+        </div>
         <div className="flex items-center gap-2">
           <input
             className="h-9 rounded-md border border-input px-3 text-sm"
