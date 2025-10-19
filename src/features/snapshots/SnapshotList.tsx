@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
+import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
 type DiffSummary = {
   added: string[];
@@ -28,6 +29,18 @@ export function SnapshotList() {
   const { current, restoreSnapshot, stageDiff } = useProjectStore();
   const snaps = current?.snapshots ?? [];
   const [previewId, setPreviewId] = React.useState<string | null>(null);
+  const [showHelp, setShowHelp] = React.useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      const v = await loadDecrypted(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots");
+      setShowHelp(v === "1");
+    })();
+  }, [current?.id]);
+
+  React.useEffect(() => {
+    saveEncrypted(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots", showHelp ? "1" : "0");
+  }, [showHelp, current?.id]);
 
   const onRestore = async (id: string) => {
     if (confirm("Restore this snapshot? Current files will be replaced.")) {
@@ -54,6 +67,31 @@ export function SnapshotList() {
 
   return (
     <div className="text-sm">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-medium">Snapshots</div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowHelp(v => !v)} aria-label="Snapshots help">?</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots");
+              setShowHelp(false);
+            }}
+            aria-label="Reset Snapshots UI tips"
+            title="Reset Snapshots UI tips"
+          >
+            Reset UI Tips
+          </Button>
+        </div>
+      </div>
+      {showHelp && (
+        <div className="text-xs text-muted-foreground border rounded-md p-2 mb-2">
+          - Snapshots capture file states. Select a snapshot to preview differences.<br />
+          - Click entries under Added/Modified to stage a diff; Removed can stage a delete.<br />
+          - Restore replaces current files with the snapshot’s files.
+        </div>
+      )}
       {snaps.length === 0 ? (
         <div className="text-muted-foreground">No snapshots yet</div>
       ) : (

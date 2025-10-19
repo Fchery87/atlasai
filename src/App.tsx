@@ -18,6 +18,23 @@ function Header() {
           BoltForge {current ? `/ ${current.name}` : ""}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            title="Reset all UI tips across the app"
+            aria-label="Reset all UI tips"
+            onClick={() => {
+              const toRemove: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i) || "";
+                if (k.startsWith("sec_help_") || k.startsWith("sec_hide_dist_banner")) {
+                  toRemove.push(k);
+                }
+              }
+              toRemove.forEach((k) => localStorage.removeItem(k));
+            }}
+          >
+            Reset All UI Tips
+          </Button>
           <Button variant="secondary">Save</Button>
           <Button>Run</Button>
         </div>
