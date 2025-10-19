@@ -6,6 +6,9 @@ import { Badge } from "../../components/ui/badge";
 import { ProviderDefinition } from "../../lib/providers/types";
 import { OpenRouterDef, OpenRouterAdapter } from "../../lib/providers/openrouter";
 import { OllamaDef, OllamaAdapter } from "../../lib/providers/ollama";
+import { GroqDef, GroqAdapter } from "../../lib/providers/groq";
+import { AnthropicDef, AnthropicAdapter } from "../../lib/providers/anthropic";
+import { GPT5Def, GPT5Adapter } from "../../lib/providers/gpt5";
 import { loadProviderKey, saveProviderKey, clearProviderKey } from "../../lib/crypto/keys";
 import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
@@ -19,6 +22,9 @@ type ProviderEntry = {
 const initialProviders: ProviderEntry[] = [
   { def: OpenRouterDef, key: "", status: "unknown" },
   { def: OllamaDef, key: "", status: "unknown" },
+  { def: GroqDef, key: "", status: "unknown" },
+  { def: AnthropicDef, key: "", status: "unknown" },
+  { def: GPT5Def, key: "", status: "unknown" },
 ];
 
 function StatusBadge({ status }: { status?: "unknown" | "valid" | "invalid" }) {
@@ -66,6 +72,12 @@ export function ProviderManager() {
         result = await OpenRouterAdapter.validate(p.def, p.key);
       } else if (p.def.id === "ollama") {
         result = await OllamaAdapter.validate(p.def, p.key);
+      } else if (p.def.id === "groq") {
+        result = await GroqAdapter.validate(p.def, p.key);
+      } else if (p.def.id === "anthropic") {
+        result = await AnthropicAdapter.validate(p.def, p.key);
+      } else if (p.def.id === "gpt5") {
+        result = await GPT5Adapter.validate(p.def, p.key);
       }
       setProviders(prev =>
         prev.map(e =>
