@@ -21,6 +21,18 @@ function Header() {
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
+            title="Reset workbench pane sizes to default"
+            aria-label="Reset workbench layout"
+            onClick={() => {
+              const sizes = [26, 38, 36];
+              localStorage.setItem("bf_split_workbench", JSON.stringify(sizes));
+              window.dispatchEvent(new CustomEvent("bf:split-reset", { detail: { key: "bf_split_workbench", sizes } }));
+            }}
+          >
+            Reset Layout
+          </Button>
+          <Button
+            variant="ghost"
             title="Reset all UI tips across the app"
             aria-label="Reset all UI tips"
             onClick={() => {
@@ -47,7 +59,7 @@ function Header() {
 }
 
 function EditorPanel() {
-  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock } = useProjectStore();
+  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock, undoStack, redoStack, undoLastApply, redoLastApply } = useProjectStore();
   const file = current?.files.find((f) => f.path === currentFilePath);
   const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
   const debouncedCode = useDebounced(code, 150);
@@ -74,6 +86,7 @@ function EditorPanel() {
   };
 
   // Keyboard shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Enter stage, Shift+Cmd/Ctrl+Enter approve, Escape reject
+  // Undo/Redo: Cmd/Ctrl+Z (undo), Shift+Cmd/Ctrl+Z (redo)
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
@@ -84,20 +97,29 @@ function EditorPanel() {
         }
         return;
       }
-      if (e.key.toLowerCase() === "s") {
+      const k = e.key.toLowerCase();
+      if (k === "s") {
         e.preventDefault();
         onSave();
-      } else if (e.key === "Enter" && e.shiftKey) {
+      } else if (k === "enter" && e.shiftKey) {
         e.preventDefault();
         if (staged && !fileLock) approveDiff();
-      } else if (e.key === "Enter") {
+      } else if (k === "enter") {
         e.preventDefault();
         onStage();
+      } else if (k === "z" && e.shiftKey) {
+        e.preventDefault();
+        // redo
+        redoLastApply();
+      } else if (k === "z") {
+        e.preventDefault();
+        // undo
+        undoLastApply();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath, formatOnSave, lang]);
+  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath, formatOnSave, lang, undoLastApply, redoLastApply]);
 
   React.useEffect(() => {
     localStorage.setItem("bf_format_on_save", formatOnSave ? "1" : "0");
@@ -141,6 +163,16 @@ function EditorPanel() {
               <Button onClick={approveDiff} disabled={fileLock} title="Approve (Shift+Ctrl/Cmd+Enter)">Approve</Button>
               <Button variant="ghost" onClick={rejectDiff} title="Reject (Esc)">Reject</Button>
             </>
+          )}
+          {!staged && (undoStack.length > 0 || redoStack.length > 0) && (
+            <div className="flex items-center gap-2">
+              {undoStack.length > 0 && (
+                <Button variant="ghost" onClick={undoLastApply} title="Undo last apply">Undo</Button>
+              )}
+              {redoStack.length > 0 && (
+                <Button variant="ghost" onClick={redoLastApply} title="Redo last apply">Redo</Button>
+              )}
+            </div>
           )}
         </div>
       </CardHeader>
@@ -244,6 +276,20 @@ function ChatPanel() {
     return bundle ? bundle.adapter.capabilities(bundle.def) : { vision: false, tools: false };
   }, [registry, providerId]);
 
+  // Auto-enable images toggle when switching to a vision-capable provider, and auto-disable otherwise
+  const [imageHint, setImageHint] = React.useState<string>("");
+  React.useEffect(() => {
+    if (providerCaps.vision) {
+      setIncludeImagesAsDataUrl(true);
+      setImageHint("Images enabled for this provider.");
+      const t = setTimeout(() => setImageHint(""), 2500);
+      return () => clearTimeout(t);
+    } else {
+      setIncludeImagesAsDataUrl(false);
+      setImageHint("");
+    }
+  }, [providerCaps.vision]);
+
   const modelsForProvider = React.useMemo(() => {
     const bundle = registry[providerId];
     return bundle?.def.models?.map((m: any) => m.id) ?? [];
@@ -289,10 +335,13 @@ function ChatPanel() {
     return msgs;
   };
 
+  const stopRef = React.useRef<boolean>(false);
+
   const send = async () => {
     const bundle = registry[providerId];
     if (!bundle) return;
     setStreaming(true);
+    stopRef.current = false;
     setOutput("");
     setStatus("Starting...");
     let key = "";
@@ -306,21 +355,32 @@ function ChatPanel() {
       }
       key = k.plaintext;
     }
+    const ac = new AbortController();
+    stopRef.current = false;
     try {
       const payload = {
         model: model || (bundle.def.models[0]?.id ?? ""),
         messages: buildMessages(),
       };
-      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload)) {
+      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload, { signal: ac.signal })) {
+        if (stopRef.current) {
+          ac.abort();
+          setStatus("Stopped");
+          break;
+        }
         if (chunk.type === "text") {
           setOutput((prev) => prev + chunk.data);
         } else {
           setStatus(chunk.data);
         }
       }
-      setStatus("Done");
+      if (!stopRef.current) setStatus("Done");
     } catch (e: any) {
-      setStatus(e?.message ?? "Stream failed");
+      if (e?.name === "AbortError") {
+        setStatus("Stopped");
+      } else {
+        setStatus(e?.message ?? "Stream failed");
+      }
     } finally {
       setStreaming(false);
     }
@@ -444,7 +504,10 @@ function ChatPanel() {
               Use current file as target
             </label>
           </div>
-          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">{status}</div>
+          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">
+            {imageHint ? <span className="mr-2">{imageHint}</span> : null}
+            {status}
+          </div>
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
@@ -455,9 +518,22 @@ function ChatPanel() {
               value={prompt}
               onChange={(e) => setPrompt(e.currentTarget.value)}
             />
-            <Button onClick={send} disabled={!prompt.trim() || streaming} aria-label="Send">
-              {streaming ? "Streaming..." : "Send"}
-            </Button>
+            {!streaming ? (
+              <Button onClick={send} disabled={!prompt.trim()} aria-label="Send">
+                Send
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  stopRef.current = true;
+                }}
+                aria-label="Stop"
+                title="Stop streaming"
+              >
+                Stop
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -706,6 +782,7 @@ import { SnapshotList } from "./features/snapshots/SnapshotList";
 import { CommandPalette, useCommandPalette } from "./features/commands/CommandPalette";
 import { GitPanel } from "./features/git/GitPanel";
 import { DeployPanel } from "./features/deploy/DeployPanel";
+import { TemplatesGallery } from "./features/templates/TemplatesGallery";
 
 export default function App() {
   const { open, setOpen } = useCommandPalette();
@@ -723,8 +800,8 @@ export default function App() {
             <CardContent><QuickActions /></CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Search</CardTitle></CardHeader>
-            <CardContent><SearchBar /></CardContent>
+            <CardHeader><CardTitle>Templates</CardTitle></CardHeader>
+            <CardContent><TemplatesGallery /></CardContent>
           </Card>
         </section>
         <section aria-label="Integrations" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

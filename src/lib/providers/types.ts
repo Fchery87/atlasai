@@ -46,8 +46,12 @@ export type DeltaChunk = {
   data: string;
 };
 
+export type StreamOptions = {
+  signal?: AbortSignal;
+};
+
 export interface ProviderAdapter {
   validate(def: ProviderDefinition, creds: string): Promise<{ ok: boolean; message?: string }>;
-  stream(def: ProviderDefinition, creds: string, payload: ProviderPayload): AsyncIterable<DeltaChunk>;
+  stream(def: ProviderDefinition, creds: string, payload: ProviderPayload, opts?: StreamOptions): AsyncIterable<DeltaChunk>;
   capabilities(def: ProviderDefinition): CapabilitySet;
 }

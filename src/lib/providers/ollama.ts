@@ -22,7 +22,7 @@ export const OllamaAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, _creds, payload: ProviderPayload): AsyncIterable<DeltaChunk> {
+  async *stream(def, _creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
     const res = await fetch(`${def.baseUrl}/chat`, {
       method: "POST",
       headers: def.headers ?? {},
@@ -35,6 +35,7 @@ export const OllamaAdapter: ProviderAdapter = {
           num_predict: payload.max_tokens,
         },
       }),
+      signal: opts?.signal,
     });
     if (!res.ok || !res.body) {
       yield { type: "event", data: `error: HTTP ${res.status}` };

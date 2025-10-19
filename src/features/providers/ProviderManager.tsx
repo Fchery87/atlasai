@@ -12,6 +12,7 @@ import { GPT5Def, GPT5Adapter } from "../../lib/providers/gpt5";
 import { GenericOpenAIAdapter } from "../../lib/providers/generic";
 import { loadProviderKey, saveProviderKey, clearProviderKey } from "../../lib/crypto/keys";
 import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
+import { z } from "zod";
 
 type ProviderEntry = {
   def: ProviderDefinition;
@@ -52,8 +53,18 @@ export function ProviderManager() {
 
       const entries = await Promise.all(
         baseList.map(async (p) => {
+          // Load API key
           const { plaintext } = await loadProviderKey(p.def.id);
-          return { ...p, key: plaintext || "" };
+          // Load encrypted custom headers (do not rely on plaintext in custom provider JSON)
+          let mergedDef = { ...p.def };
+          try {
+            const enc = await loadDecrypted(`sec_provider_headers:${p.def.id}`);
+            if (enc) {
+              const hdrs = JSON.parse(enc);
+              mergedDef = { ...mergedDef, headers: { ...(mergedDef.headers ?? {}), ...hdrs } };
+            }
+          } catch {}
+          return { ...p, def: mergedDef, key: plaintext || "" };
         })
       );
       setProviders(entries);
@@ -127,28 +138,119 @@ export function ProviderManager() {
     keyName: string;
     models: string;
   }>({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+  const [headers, setHeaders] = React.useState<Array<{ key: string; value: string }>>([]);
+  const [headerMask, setHeaderMask] = React.useState<boolean[]>([]);
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [editId, setEditId] = React.useState<string | null>(null);
 
-  const addCustomProvider = () => {
-    const id = newProv.id.trim() || newProv.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const CustomDefSchema = z.object({
+    id: z.string().min(1, "ID is required"),
+    name: z.string().min(1, "Name is required"),
+    baseUrl: z.string().url("Base URL must be a valid URL"),
+    authType: z.enum(["apiKey", "bearer", "none"]),
+    keyName: z.string().optional(),
+    models: z.string().min(1, "At least one model ID is required"),
+    headers: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
+  });
+
+  React.useEffect(() => {
+    // Keep mask array in sync with rows length (default to hidden)
+    setHeaderMask((m) => {
+      const next = m.slice();
+      while (next.length < headers.length) next.push(true);
+      if (next.length > headers.length) next.length = headers.length;
+      return next;
+    });
+  }, [headers.length]);
+
+  const addHeaderRow = () => {
+    setHeaders((rows) => [...rows, { key: "", value: "" }]);
+    setHeaderMask((m) => [...m, true]);
+  };
+  const removeHeaderRow = (idx: number) => {
+    setHeaders((rows) => rows.filter((_, i) => i !== idx));
+    setHeaderMask((m) => m.filter((_, i) => i !== idx));
+  };
+  const updateHeaderRow = (idx: number, field: "key" | "value", val: string) =>
+    setHeaders((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)));
+
+  const addCustomProvider = async () => {
+    // zod validate
+    const parsed = CustomDefSchema.safeParse({
+      ...newProv,
+      headers,
+    });
+    if (!parsed.success) {
+      const errs: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const path = issue.path[0] as string;
+        errs[path] = issue.message;
+      }
+      setErrors(errs);
+      return;
+    }
+    setErrors({});
+    const idRaw = newProv.id.trim() || newProv.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const builtins = new Set(["openrouter","ollama","groq","anthropic","gpt5"]);
+    if (builtins.has(idRaw)) {
+      alert("Provider ID conflicts with a built-in. Please choose a different ID (e.g., add '-override').");
+      return;
+    }
+    const id = idRaw;
+    const headerObj = headers.reduce<Record<string, string>>((acc, h) => {
+      if (h.key.trim()) acc[h.key.trim()] = h.value;
+      return acc;
+    }, {});
+    const modelList = newProv.models
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((id) => ({ id }));
+
     const def: ProviderDefinition = {
       id,
       name: newProv.name || id,
       baseUrl: newProv.baseUrl.trim(),
       auth: { type: newProv.authType, keyName: newProv.keyName || undefined } as any,
-      models: newProv.models.split(",").map((s) => ({ id: s.trim() })).filter((m) => m.id),
+      // Do not persist sensitive headers in plain provider JSON
+      headers: undefined,
+      models: modelList,
     };
     // Persist to localStorage
     const existingRaw = localStorage.getItem("bf_custom_providers");
     let list: ProviderDefinition[] = [];
     try { if (existingRaw) list = JSON.parse(existingRaw); } catch {}
-    // Replace if id exists
+    // Overwrite confirmation if ID exists and not editing same
     const idx = list.findIndex((p) => p.id === def.id);
+    if (idx >= 0 && editId !== def.id) {
+      const ok = confirm(`A provider with ID '${def.id}' already exists. Overwrite it?`);
+      if (!ok) return;
+    }
     if (idx >= 0) list[idx] = def; else list.push(def);
     localStorage.setItem("bf_custom_providers", JSON.stringify(list));
-    // Append to UI list
-    setProviders((prev) => [...prev, { def, key: "", status: "unknown" }]);
+    // Persist custom headers encrypted under per-provider key
+    if (Object.keys(headerObj).length) {
+      await saveEncrypted(`sec_provider_headers:${id}`, JSON.stringify(headerObj));
+    } else {
+      localStorage.removeItem(`sec_provider_headers:${id}`);
+    }
+    // Update UI list: replace if editing, else append
+    setProviders((prev) => {
+      const mergedDef = { ...def, headers: Object.keys(headerObj).length ? headerObj : undefined };
+      if (editId && prev.some(e => e.def.id === editId)) {
+        return prev.map(e => (e.def.id === editId ? { ...e, def: mergedDef } : e));
+      }
+      // If an item with same id already exists in UI, replace it
+      if (prev.some(e => e.def.id === def.id)) {
+        return prev.map(e => (e.def.id === def.id ? { ...e, def: mergedDef } : e));
+      }
+      return [...prev, { def: mergedDef, key: "", status: "unknown" }];
+    });
     // Reset form
+    setEditId(null);
     setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+    setHeaders([]);
+    setHeaderMask([]);
   };
 
   return (
@@ -180,52 +282,167 @@ export function ProviderManager() {
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {providers.map(p => (
-          <Card key={p.def.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="font-semibold">{p.def.name}</span>
-                <StatusBadge status={p.status} />
-              </CardTitle>
-              <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
-            </CardHeader>
-            <CardContent className="flex items-end gap-2">
-              {p.def.auth.type !== "none" ? (
-                <Input
-                  aria-label={`${p.def.name} API key`}
-                  placeholder={p.def.auth.type === "apiKey" ? "API Key" : "Bearer token"}
-                  type="password"
-                  value={p.key}
-                  onChange={e => updateKey(p.def.id, e.currentTarget.value)}
-                />
-              ) : (
-                <div className="text-sm text-muted-foreground">No key required</div>
-              )}
-              <Button
-                onClick={() => save(p)}
-                variant="secondary"
-                disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
-              >
-                Save
-              </Button>
-              <Button
-                onClick={() => validate(p)}
-                disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
-                aria-busy={busy === p.def.id}
-              >
-                {busy === p.def.id ? "Validating..." : "Validate"}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+        {providers.map(p => {
+          const builtins = new Set(["openrouter","ollama","groq","anthropic","gpt5"]);
+          const isBuiltin = builtins.has(p.def.id);
+          return (
+            <Card key={p.def.id}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="font-semibold">{p.def.name}</span>
+                  <StatusBadge status={p.status} />
+                  {isBuiltin ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Create override from this built-in"
+                      aria-label={`Override ${p.def.name}`}
+                      onClick={() => {
+                        setEditId(null); // creating new override
+                        setNewProv({
+                          id: `${p.def.id}-override`,
+                          name: `${p.def.name} (override)`,
+                          baseUrl: p.def.baseUrl,
+                          authType: (p.def.auth.type as any) ?? "apiKey",
+                          keyName: p.def.auth.keyName || "Authorization",
+                          models: (p.def.models || []).map(m => m.id).join(","),
+                        });
+                        const hdrs = p.def.headers || {};
+                        const rows = Object.keys(hdrs).map(k => ({ key: k, value: hdrs[k]! }));
+                        setHeaders(rows);
+                        setHeaderMask(rows.map(() => true));
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      Override
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Edit custom provider"
+                        aria-label={`Edit ${p.def.name}`}
+                        onClick={() => {
+                          setEditId(p.def.id);
+                          setNewProv({
+                            id: p.def.id,
+                            name: p.def.name,
+                            baseUrl: p.def.baseUrl,
+                            authType: (p.def.auth.type as any) ?? "apiKey",
+                            keyName: p.def.auth.keyName || "Authorization",
+                            models: (p.def.models || []).map(m => m.id).join(","),
+                          });
+                          const hdrs = p.def.headers || {};
+                          const rows = Object.keys(hdrs).map(k => ({ key: k, value: hdrs[k]! }));
+                          setHeaders(rows);
+                          setHeaderMask(rows.map(() => true));
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Duplicate custom provider"
+                        aria-label={`Duplicate ${p.def.name}`}
+                        onClick={() => {
+                          setEditId(null);
+                          setNewProv({
+                            id: `${p.def.id}-copy`,
+                            name: `${p.def.name} (copy)`,
+                            baseUrl: p.def.baseUrl,
+                            authType: (p.def.auth.type as any) ?? "apiKey",
+                            keyName: p.def.auth.keyName || "Authorization",
+                            models: (p.def.models || []).map(m => m.id).join(","),
+                          });
+                          const hdrs = p.def.headers || {};
+                          const rows = Object.keys(hdrs).map(k => ({ key: k, value: hdrs[k]! }));
+                          setHeaders(rows);
+                          setHeaderMask(rows.map(() => true));
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                      >
+                        Duplicate
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Delete custom provider"
+                        aria-label={`Delete ${p.def.name}`}
+                        onClick={async () => {
+                          if (!confirm(`Delete provider '${p.def.name}'?`)) return;
+                          // remove from local provider list
+                          setProviders(prev => prev.filter(e => e.def.id !== p.def.id));
+                          // remove from persisted bf_custom_providers
+                          const raw = localStorage.getItem("bf_custom_providers");
+                          try {
+                            const list: ProviderDefinition[] = raw ? JSON.parse(raw) : [];
+                            const filtered = list.filter((d: any) => d.id !== p.def.id);
+                            localStorage.setItem("bf_custom_providers", JSON.stringify(filtered));
+                          } catch {}
+                          // remove encrypted headers and key
+                          localStorage.removeItem(`sec_provider_headers:${p.def.id}`);
+                          clearProviderKey(p.def.id);
+                          // If we were editing this one, reset form
+                          setEditId(prev => (prev === p.def.id ? null : prev));
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </CardTitle>
+                <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
+              </CardHeader>
+              <CardContent className="flex items-end gap-2">
+                {p.def.auth.type !== "none" ? (
+                  <Input
+                    aria-label={`${p.def.name} API key`}
+                    placeholder={p.def.auth.type === "apiKey" ? "API Key" : "Bearer token"}
+                    type="password"
+                    value={p.key}
+                    onChange={e => updateKey(p.def.id, e.currentTarget.value)}
+                  />
+                ) : (
+                  <div className="text-sm text-muted-foreground">No key required</div>
+                )}
+                <Button
+                  onClick={() => save(p)}
+                  variant="secondary"
+                  disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={() => validate(p)}
+                  disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+                  aria-busy={busy === p.def.id}
+                >
+                  {busy === p.def.id ? "Validating..." : "Validate"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="rounded-md border p-3 space-y-2">
         <div className="font-medium">Add Custom Provider (OpenAI-compatible)</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Input aria-label="Provider ID" placeholder="id (slug)" value={newProv.id} onChange={(e) => setNewProv(v => ({ ...v, id: e.currentTarget.value }))} />
-          <Input aria-label="Provider Name" placeholder="Display name" value={newProv.name} onChange={(e) => setNewProv(v => ({ ...v, name: e.currentTarget.value }))} />
-          <Input aria-label="Base URL" placeholder="https://api.example.com/v1" value={newProv.baseUrl} onChange={(e) => setNewProv(v => ({ ...v, baseUrl: e.currentTarget.value }))} />
+          <div>
+            <Input aria-label="Provider ID" placeholder="id (slug)" value={newProv.id} onChange={(e) => setNewProv(v => ({ ...v, id: e.currentTarget.value }))} />
+            {errors.id && <div className="text-xs text-red-600 mt-1">{errors.id}</div>}
+          </div>
+          <div>
+            <Input aria-label="Provider Name" placeholder="Display name" value={newProv.name} onChange={(e) => setNewProv(v => ({ ...v, name: e.currentTarget.value }))} />
+            {errors.name && <div className="text-xs text-red-600 mt-1">{errors.name}</div>}
+          </div>
+          <div>
+            <Input aria-label="Base URL" placeholder="https://api.example.com/v1" value={newProv.baseUrl} onChange={(e) => setNewProv(v => ({ ...v, baseUrl: e.currentTarget.value }))} />
+            {errors.baseUrl && <div className="text-xs text-red-600 mt-1">{errors.baseUrl}</div>}
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <label className="text-xs">
@@ -241,21 +458,72 @@ export function ProviderManager() {
               <option value="none">none</option>
             </select>
           </label>
-          <Input aria-label="Auth header" placeholder="Header key (e.g., Authorization or x-api-key)" value={newProv.keyName} onChange={(e) => setNewProv(v => ({ ...v, keyName: e.currentTarget.value }))} />
-          <Input aria-label="Models" placeholder="model-a,model-b" value={newProv.models} onChange={(e) => setNewProv(v => ({ ...v, models: e.currentTarget.value }))} />
+          <div>
+            <Input aria-label="Auth header" placeholder="Header key (e.g., Authorization or x-api-key)" value={newProv.keyName} onChange={(e) => setNewProv(v => ({ ...v, keyName: e.currentTarget.value }))} />
+          </div>
+          <div>
+            <Input aria-label="Models" placeholder="model-a,model-b" value={newProv.models} onChange={(e) => setNewProv(v => ({ ...v, models: e.currentTarget.value }))} />
+            {errors.models && <div className="text-xs text-red-600 mt-1">{errors.models}</div>}
+          </div>
         </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Custom headers</div>
+          <div className="space-y-2">
+            {headers.map((h, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input aria-label={`Header key ${idx+1}`} placeholder="Header key" value={h.key} onChange={(e) => updateHeaderRow(idx, "key", e.currentTarget.value)} />
+                <Input
+                  aria-label={`Header value ${idx+1}`}
+                  placeholder="Header value"
+                  type={headerMask[idx] ? "password" : "text"}
+                  value={h.value}
+                  onChange={(e) => updateHeaderRow(idx, "value", e.currentTarget.value)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={headerMask[idx] ? "Show value" : "Hide value"}
+                  title={headerMask[idx] ? "Show value" : "Hide value"}
+                  onClick={() => setHeaderMask((m) => m.map((v, i) => (i === idx ? !v : v)))}
+                >
+                  {headerMask[idx] ? "👁️" : "🙈"}
+                </Button>
+                <Button variant="ghost" size="sm" aria-label="Remove header" title="Remove" onClick={() => removeHeaderRow(idx)}>Remove</Button>
+              </div>
+            ))}
+          </div>
+          <Button variant="ghost" size="sm" aria-label="Add header" onClick={addHeaderRow}>Add header</Button>
+        </div>
+
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             onClick={addCustomProvider}
             disabled={!newProv.baseUrl.trim() || !newProv.name.trim()}
-            aria-label="Add custom provider"
+            aria-label={editId ? "Save changes" : "Add custom provider"}
+            title={editId ? "Save changes to this provider" : "Add custom provider"}
           >
-            Add Provider
+            {editId ? "Save Changes" : "Add Provider"}
           </Button>
+          {editId && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditId(null);
+                setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+                setHeaders([]);
+                setHeaderMask([]);
+              }}
+              aria-label="Cancel edit"
+              title="Cancel editing"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
         <div className="text-xs text-muted-foreground">
-          Note: validation uses GET /models; streaming uses POST /chat/completions with stream=true.
+          {editId ? `Editing provider '${editId}'.` : "Note: validation uses GET /models; streaming uses POST /chat/completions with stream=true."}
         </div>
       </div>
     </div>

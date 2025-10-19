@@ -11,7 +11,7 @@ function nsKey(projectId: string | undefined, key: string) {
 }
 
 export function DeployPanel() {
-  const { current } = useProjectStore();
+  const { current, upsertFile } = useProjectStore();
   const pid = current?.id;
   const [target, setTarget] = React.useState<DeployTarget | null>(null);
   const [status, setStatus] = React.useState<string>("Idle");
@@ -623,7 +623,57 @@ export function DeployPanel() {
             <div key={i}>{l}</div>
           ))}
         </div>
-        <div className="mt-3 space-y-2">
+
+        <div className="mt-4 space-y-2">
+          <div className="font-medium">SPA Routing Helpers</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Button
+              variant="ghost"
+              title="Add 404.html forwarding to index.html for GitHub Pages SPA"
+              onClick={async () => {
+                const html = `<!doctype html><html><head><meta charset="utf-8"><title>404</title></head><body>
+<script>
+  // GitHub Pages SPA fallback: redirect all 404s to index.html preserving path in hash
+  var l = window.location;
+  var p = l.pathname.replace(/^(\\/)/, "");
+  // you can handle this in your app to route accordingly
+  l.replace(l.origin + "/index.html#/" + p);
+</script>
+</body></html>`;
+                await upsertFile("404.html", html);
+                setStatus("Added 404.html SPA fallback for GitHub Pages");
+              }}
+            >
+              Add GH Pages SPA 404.html
+            </Button>
+            <Button
+              variant="ghost"
+              title="Add Netlify _redirects file to rewrite to index.html"
+              onClick={async () => {
+                await upsertFile("_redirects", "/* /index.html 200\n");
+                setStatus("Added Netlify _redirects for SPA");
+              }}
+            >
+              Add Netlify _redirects
+            </Button>
+            <Button
+              variant="ghost"
+              title="Add vercel.json rewrites to index.html"
+              onClick={async () => {
+                const vercelJson = JSON.stringify({ rewrites: [{ source: "/(.*)", destination: "/" }] }, null, 2);
+                await upsertFile("vercel.json", vercelJson);
+                setStatus("Added vercel.json SPA rewrites");
+              }}
+            >
+              Add Vercel rewrites
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            These helpers ensure client-side routers work in production by serving index.html for all routes.
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
           <div className="font-medium">User Repo CI Workflow</div>
           <div className="flex items-center gap-2">
             <input
