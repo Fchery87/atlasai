@@ -32,6 +32,11 @@ export function DeployPanel() {
   const [userRepoBranch, setUserRepoBranch] = React.useState<string>("main");
   const [defaultBranch, setDefaultBranch] = React.useState<string>("main");
 
+  // Help toggles
+  const [ghHelp, setGhHelp] = React.useState(false);
+  const [netlifyHelp, setNetlifyHelp] = React.useState(false);
+  const [vercelHelp, setVercelHelp] = React.useState(false);
+
   // Load persisted tokens/config per-project with global fallback
   React.useEffect(() => {
     (async () => {
@@ -67,6 +72,11 @@ export function DeployPanel() {
   React.useEffect(() => { if (vercelOutDir) saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir); }, [vercelOutDir, pid]);
   React.useEffect(() => { if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo); }, [ghRepo, pid]);
   React.useEffect(() => { if (defaultBranch) saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch); }, [defaultBranch, pid]);
+
+  const distMissing = React.useMemo(() => {
+    if (!current || !useDist) return false;
+    return !current.files.some((f) => f.path.startsWith("dist/"));
+  }, [current, useDist]);
 
   const filesForDeploy = React.useCallback(() => {
     if (!current) return [];
@@ -253,6 +263,11 @@ export function DeployPanel() {
 
   return (
     <div className="space-y-2 text-sm">
+      {distMissing && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2" role="status" aria-live="polite">
+          dist/ folder not found. The deploy will use project files. Run your build locally (npm run build) to generate dist/, or use the CI workflow generator below.
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <label className="text-xs flex items-center gap-1">
           <input type="checkbox" checked={useDist} onChange={(e) => setUseDist(e.currentTarget.checked)} aria-label="Use dist/ folder if present" />
@@ -275,7 +290,23 @@ export function DeployPanel() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div className="space-y-2">
-          <div className="font-medium">GitHub Pages</div>
+          <div className="font-medium flex items-center gap-2">
+            GitHub Pages
+            <Button variant="ghost" size="sm" title="Help" aria-label="GitHub Pages help" onClick={() => setGhHelp((v) => !v)}>
+              ?
+            </Button>
+          </div>
+          {ghHelp && (
+            <div className="text-xs text-muted-foreground border rounded-md p-2">
+              Steps:
+              <ol className="list-decimal ml-4">
+                <li>Enter owner/repo.</li>
+                <li>Optionally generate and commit the GH Pages workflow to build with Vite in CI.</li>
+                <li>Click Deploy to upload files to gh-pages branch.</li>
+                <li>Enable Pages in repository settings if needed.</li>
+              </ol>
+            </div>
+          )}
           <input
             className="w-full h-9 rounded-md border border-input px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             placeholder="owner/repo"
@@ -317,7 +348,22 @@ export function DeployPanel() {
           </div>
         </div>
         <div className="space-y-2">
-          <div className="font-medium">Netlify</div>
+          <div className="font-medium flex items-center gap-2">
+            Netlify
+            <Button variant="ghost" size="sm" title="Help" aria-label="Netlify help" onClick={() => setNetlifyHelp((v) => !v)}>
+              ?
+            </Button>
+          </div>
+          {netlifyHelp && (
+            <div className="text-xs text-muted-foreground border rounded-md p-2">
+              Steps:
+              <ol className="list-decimal ml-4">
+                <li>Paste your Netlify token and Site ID.</li>
+                <li>We create a hash-based deploy and upload required files only.</li>
+                <li>Use dist/ for production builds when possible.</li>
+              </ol>
+            </div>
+          )}
           <input
             className="w-full h-9 rounded-md border border-input px-3 text-sm"
             placeholder="Netlify token"
@@ -337,7 +383,22 @@ export function DeployPanel() {
           </Button>
         </div>
         <div className="space-y-2">
-          <div className="font-medium">Vercel</div>
+          <div className="font-medium flex items-center gap-2">
+            Vercel
+            <Button variant="ghost" size="sm" title="Help" aria-label="Vercel help" onClick={() => setVercelHelp((v) => !v)}>
+              ?
+            </Button>
+          </div>
+          {vercelHelp && (
+            <div className="text-xs text-muted-foreground border rounded-md p-2">
+              Steps:
+              <ol className="list-decimal ml-4">
+                <li>Paste your Vercel token and Project name.</li>
+                <li>Optionally set framework, build command, and output dir.</li>
+                <li>We create or patch the project, then request a deployment.</li>
+              </ol>
+            </div>
+          )}
           <input
             className="w-full h-9 rounded-md border border-input px-3 text-sm"
             placeholder="Vercel token"
