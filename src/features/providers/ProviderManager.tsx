@@ -9,6 +9,7 @@ import { OllamaDef, OllamaAdapter } from "../../lib/providers/ollama";
 import { GroqDef, GroqAdapter } from "../../lib/providers/groq";
 import { AnthropicDef, AnthropicAdapter } from "../../lib/providers/anthropic";
 import { GPT5Def, GPT5Adapter } from "../../lib/providers/gpt5";
+import { GenericOpenAIAdapter } from "../../lib/providers/generic";
 import { loadProviderKey, saveProviderKey, clearProviderKey } from "../../lib/crypto/keys";
 import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
@@ -25,6 +26,7 @@ const initialProviders: ProviderEntry[] = [
   { def: GroqDef, key: "", status: "unknown" },
   { def: AnthropicDef, key: "", status: "unknown" },
   { def: GPT5Def, key: "", status: "unknown" },
+  // Custom providers will be appended at runtime from localStorage
 ];
 
 function StatusBadge({ status }: { status?: "unknown" | "valid" | "invalid" }) {
@@ -39,10 +41,17 @@ export function ProviderManager() {
   const [showHelp, setShowHelp] = React.useState(false);
 
   React.useEffect(() => {
-    // Load encrypted keys from storage
+    // Load encrypted keys from storage + custom providers
     (async () => {
+      const customRaw = localStorage.getItem("bf_custom_providers");
+      let customDefs: ProviderDefinition[] = [];
+      try {
+        if (customRaw) customDefs = JSON.parse(customRaw);
+      } catch {}
+      const baseList: ProviderEntry[] = [...initialProviders, ...customDefs.map((def) => ({ def, key: "", status: "unknown" as const }))];
+
       const entries = await Promise.all(
-        initialProviders.map(async (p) => {
+        baseList.map(async (p) => {
           const { plaintext } = await loadProviderKey(p.def.id);
           return { ...p, key: plaintext || "" };
         })
@@ -78,6 +87,9 @@ export function ProviderManager() {
         result = await AnthropicAdapter.validate(p.def, p.key);
       } else if (p.def.id === "gpt5") {
         result = await GPT5Adapter.validate(p.def, p.key);
+      } else {
+        // Custom providers default to generic OpenAI adapter
+        result = await GenericOpenAIAdapter.validate(p.def, p.key);
       }
       setProviders(prev =>
         prev.map(e =>
@@ -106,6 +118,39 @@ export function ProviderManager() {
     }
   };
 
+  // Custom provider form state
+  const [newProv, setNewProv] = React.useState<{
+    id: string;
+    name: string;
+    baseUrl: string;
+    authType: "apiKey" | "bearer" | "none";
+    keyName: string;
+    models: string;
+  }>({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+
+  const addCustomProvider = () => {
+    const id = newProv.id.trim() || newProv.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const def: ProviderDefinition = {
+      id,
+      name: newProv.name || id,
+      baseUrl: newProv.baseUrl.trim(),
+      auth: { type: newProv.authType, keyName: newProv.keyName || undefined } as any,
+      models: newProv.models.split(",").map((s) => ({ id: s.trim() })).filter((m) => m.id),
+    };
+    // Persist to localStorage
+    const existingRaw = localStorage.getItem("bf_custom_providers");
+    let list: ProviderDefinition[] = [];
+    try { if (existingRaw) list = JSON.parse(existingRaw); } catch {}
+    // Replace if id exists
+    const idx = list.findIndex((p) => p.id === def.id);
+    if (idx >= 0) list[idx] = def; else list.push(def);
+    localStorage.setItem("bf_custom_providers", JSON.stringify(list));
+    // Append to UI list
+    setProviders((prev) => [...prev, { def, key: "", status: "unknown" }]);
+    // Reset form
+    setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+  };
+
   return (
     <div className="space-y-3" aria-label="Provider Manager">
       <div className="flex items-center justify-between">
@@ -130,7 +175,8 @@ export function ProviderManager() {
         <div className="text-xs text-muted-foreground border rounded-md p-2">
           - Enter API keys for providers you use (stored encrypted in your browser).<br />
           - Validate to ensure the key works; Save to persist the key.<br />
-          - You can clear a key by saving an empty value or from browser storage controls.
+          - You can clear a key by saving an empty value or from browser storage controls.<br />
+          - Add a custom provider compatible with OpenAI chat API below.
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -172,6 +218,45 @@ export function ProviderManager() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="rounded-md border p-3 space-y-2">
+        <div className="font-medium">Add Custom Provider (OpenAI-compatible)</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <Input aria-label="Provider ID" placeholder="id (slug)" value={newProv.id} onChange={(e) => setNewProv(v => ({ ...v, id: e.currentTarget.value }))} />
+          <Input aria-label="Provider Name" placeholder="Display name" value={newProv.name} onChange={(e) => setNewProv(v => ({ ...v, name: e.currentTarget.value }))} />
+          <Input aria-label="Base URL" placeholder="https://api.example.com/v1" value={newProv.baseUrl} onChange={(e) => setNewProv(v => ({ ...v, baseUrl: e.currentTarget.value }))} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <label className="text-xs">
+            Auth Type
+            <select
+              className="mt-1 w-full h-8 rounded-md border border-input px-2 text-sm"
+              aria-label="Auth Type"
+              value={newProv.authType}
+              onChange={(e) => setNewProv(v => ({ ...v, authType: e.currentTarget.value as any }))}
+            >
+              <option value="apiKey">apiKey</option>
+              <option value="bearer">bearer</option>
+              <option value="none">none</option>
+            </select>
+          </label>
+          <Input aria-label="Auth header" placeholder="Header key (e.g., Authorization or x-api-key)" value={newProv.keyName} onChange={(e) => setNewProv(v => ({ ...v, keyName: e.currentTarget.value }))} />
+          <Input aria-label="Models" placeholder="model-a,model-b" value={newProv.models} onChange={(e) => setNewProv(v => ({ ...v, models: e.currentTarget.value }))} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={addCustomProvider}
+            disabled={!newProv.baseUrl.trim() || !newProv.name.trim()}
+            aria-label="Add custom provider"
+          >
+            Add Provider
+          </Button>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Note: validation uses GET /models; streaming uses POST /chat/completions with stream=true.
+        </div>
       </div>
     </div>
   );
