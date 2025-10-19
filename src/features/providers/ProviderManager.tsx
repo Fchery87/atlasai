@@ -53,8 +53,18 @@ export function ProviderManager() {
 
       const entries = await Promise.all(
         baseList.map(async (p) => {
+          // Load API key
           const { plaintext } = await loadProviderKey(p.def.id);
-          return { ...p, key: plaintext || "" };
+          // Load encrypted custom headers (do not rely on plaintext in custom provider JSON)
+          let mergedDef = { ...p.def };
+          try {
+            const enc = await loadDecrypted(`sec_provider_headers:${p.def.id}`);
+            if (enc) {
+              const hdrs = JSON.parse(enc);
+              mergedDef = { ...mergedDef, headers: { ...(mergedDef.headers ?? {}), ...hdrs } };
+            }
+          } catch {}
+          return { ...p, def: mergedDef, key: plaintext || "" };
         })
       );
       setProviders(entries);
@@ -146,7 +156,7 @@ export function ProviderManager() {
   const updateHeaderRow = (idx: number, field: "key" | "value", val: string) =>
     setHeaders((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)));
 
-  const addCustomProvider = () => {
+  const addCustomProvider = async () => {
     // zod validate
     const parsed = CustomDefSchema.safeParse({
       ...newProv,
@@ -178,7 +188,8 @@ export function ProviderManager() {
       name: newProv.name || id,
       baseUrl: newProv.baseUrl.trim(),
       auth: { type: newProv.authType, keyName: newProv.keyName || undefined } as any,
-      headers: Object.keys(headerObj).length ? headerObj : undefined,
+      // Do not persist sensitive headers in plain provider JSON
+      headers: undefined,
       models: modelList,
     };
     // Persist to localStorage
@@ -189,8 +200,12 @@ export function ProviderManager() {
     const idx = list.findIndex((p) => p.id === def.id);
     if (idx >= 0) list[idx] = def; else list.push(def);
     localStorage.setItem("bf_custom_providers", JSON.stringify(list));
-    // Append to UI list
-    setProviders((prev) => [...prev, { def, key: "", status: "unknown" }]);
+    // Persist custom headers encrypted under per-provider key
+    if (Object.keys(headerObj).length) {
+      await saveEncrypted(`sec_provider_headers:${id}`, JSON.stringify(headerObj));
+    }
+    // Append to UI list with merged headers in-memory
+    setProviders((prev) => [...prev, { def: { ...def, headers: Object.keys(headerObj).length ? headerObj : undefined }, key: "", status: "unknown" }]);
     // Reset form
     setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
     setHeaders([]);
