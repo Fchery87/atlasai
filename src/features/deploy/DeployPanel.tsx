@@ -288,22 +288,29 @@ export function DeployPanel() {
           />
         </label>
       </div>
+      {distMissing && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2 text-xs" role="status" aria-live="polite">
+          No dist/ files detected. You can:
+          <ul className="list-disc list-inside">
+            <li>Uncheck “Use dist/ if present” to deploy current project files, or</li>
+            <li>Generate a CI workflow below to build and publish dist/ automatically.</li>
+          </ul>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div className="space-y-2">
-          <div className="font-medium flex items-center gap-2">
-            GitHub Pages
-            <Button variant="ghost" size="sm" title="Help" aria-label="GitHub Pages help" onClick={() => setGhHelp((v) => !v)}>
-              ?
-            </Button>
+          <div className="flex items-center justify-between">
+            <div className="font-medium">GitHub Pages</div>
+            <Button variant="ghost" size="sm" onClick={() => setGhHelp((v) => !v)} aria-label="GitHub Pages help">?</Button>
           </div>
           {ghHelp && (
-            <div className="text-xs text-muted-foreground border rounded-md p-2">
-              Steps:
-              <ol className="list-decimal ml-4">
-                <li>Enter owner/repo.</li>
-                <li>Optionally generate and commit the GH Pages workflow to build with Vite in CI.</li>
+            <div className="text-xs text-muted-foreground">
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Enter owner/repo where you have write access.</li>
+                <li>Sign in via Git (top of Git panel) if you haven't.</li>
                 <li>Click Deploy to upload files to gh-pages branch.</li>
-                <li>Enable Pages in repository settings if needed.</li>
+                <li>Enable Pages in repo settings for gh-pages branch.</li>
+                <li>Optional: Download a CI workflow to build dist/ and publish automatically.</li>
               </ol>
             </div>
           )}
@@ -348,19 +355,17 @@ export function DeployPanel() {
           </div>
         </div>
         <div className="space-y-2">
-          <div className="font-medium flex items-center gap-2">
-            Netlify
-            <Button variant="ghost" size="sm" title="Help" aria-label="Netlify help" onClick={() => setNetlifyHelp((v) => !v)}>
-              ?
-            </Button>
+          <div className="flex items-center justify-between">
+            <div className="font-medium">Netlify</div>
+            <Button variant="ghost" size="sm" onClick={() => setNetlifyHelp((v) => !v)} aria-label="Netlify help">?</Button>
           </div>
           {netlifyHelp && (
-            <div className="text-xs text-muted-foreground border rounded-md p-2">
-              Steps:
-              <ol className="list-decimal ml-4">
-                <li>Paste your Netlify token and Site ID.</li>
-                <li>We create a hash-based deploy and upload required files only.</li>
-                <li>Use dist/ for production builds when possible.</li>
+            <div className="text-xs text-muted-foreground">
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Create a Netlify Personal Access Token and Site ID.</li>
+                <li>Enter token and site ID here. Token requires deploy rights.</li>
+                <li>Click Deploy to create a hash-based deploy and upload required files only.</li>
+                <li>Use dist/ for faster deploys, or disable it to deploy current files.</li>
               </ol>
             </div>
           )}
@@ -383,12 +388,62 @@ export function DeployPanel() {
           </Button>
         </div>
         <div className="space-y-2">
-          <div className="font-medium flex items-center gap-2">
-            Vercel
-            <Button variant="ghost" size="sm" title="Help" aria-label="Vercel help" onClick={() => setVercelHelp((v) => !v)}>
-              ?
-            </Button>
+          <div className="flex items-center justify-between">
+            <div className="font-medium">Vercel</div>
+            <Button variant="ghost" size="sm" onClick={() => setVercelHelp((v) => !v)} aria-label="Vercel help">?</Button>
           </div>
+          {vercelHelp && (
+            <div className="text-xs text-muted-foreground">
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Create a Vercel token and a project name.</li>
+                <li>Optionally set framework, build command, and output directory.</li>
+                <li>Click Deploy to create/patch the project and trigger a deployment.</li>
+                <li>Use CI to build dist/ if you don’t commit built assets.</li>
+              </ol>
+            </div>
+          )}
+          <input
+            className="w-full h-9 rounded-md border border-input px-3 text-sm"
+            placeholder="Vercel token"
+            aria-label="Vercel token"
+            value={vercelToken}
+            onChange={(e) => setVercelToken(e.currentTarget.value)}
+          />
+          <input
+            className="w-full h-9 rounded-md border border-input px-3 text-sm"
+            placeholder="Project name"
+            aria-label="Vercel project"
+            value={vercelProject}
+            onChange={(e) => setVercelProject(e.currentTarget.value)}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <input
+              className="w-full h-9 rounded-md border border-input px-3 text-sm"
+              placeholder="framework (e.g., vite)"
+              aria-label="Vercel framework"
+              value={vercelFramework}
+              onChange={(e) => setVercelFramework(e.currentTarget.value)}
+            />
+            <input
+              className="w-full h-9 rounded-md border border-input px-3 text-sm"
+              placeholder="build command"
+              aria-label="Vercel build command"
+              value={vercelBuildCmd}
+              onChange={(e) => setVercelBuildCmd(e.currentTarget.value)}
+            />
+            <input
+              className="w-full h-9 rounded-md border border-input px-3 text-sm"
+              placeholder="output dir"
+              aria-label="Vercel output dir"
+              value={vercelOutDir}
+              onChange={(e) => setVercelOutDir(e.currentTarget.value)}
+            />
+          </div>
+          <Button variant="secondary" onClick={deployVercel} aria-label="Deploy to Vercel" title="Links project/config then requests a deployment">
+            Deploy
+          </Button>
+        </div>
+      </div>
           {vercelHelp && (
             <div className="text-xs text-muted-foreground border rounded-md p-2">
               Steps:
