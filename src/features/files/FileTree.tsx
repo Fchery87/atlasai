@@ -303,7 +303,7 @@ export function FileTree() {
   const renderNode = (node: Node) => {
     if (node.type === "file") {
       return (
-        <li key={node.path} className="flex items-center justify-between gap-2">
+        <li key={node.path} data-path={node.path} className="flex items-center justify-between gap-2">
           <input
             type="checkbox"
             aria-label={`Select ${node.path}`}
@@ -401,8 +401,76 @@ export function FileTree() {
     );
   };
 
+  // Rubber-band (drag) selection
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const dragStart = React.useRef<{ x: number; y: number; union: boolean } | null>(null);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    // Only left click and not on interactive elements
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, input, a, textarea, select")) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    dragStart.current = { x, y, union: e.metaKey || e.ctrlKey };
+    setDrag({ x, y, w: 0, h: 0 });
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragStart.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const sx = dragStart.current.x;
+    const sy = dragStart.current.y;
+    const minX = Math.min(sx, x);
+    const minY = Math.min(sy, y);
+    const w = Math.abs(x - sx);
+    const h = Math.abs(y - sy);
+    setDrag({ x: minX, y: minY, w, h });
+
+    // Hit test file rows
+    const lis = Array.from(containerRef.current.querySelectorAll("li[data-path]")) as HTMLLIElement[];
+    const hits: string[] = [];
+    const abs = containerRef.current.getBoundingClientRect();
+    for (const li of lis) {
+      const r = li.getBoundingClientRect();
+      const rx = r.left - abs.left;
+      const ry = r.top - abs.top;
+      const rw = r.width;
+      const rh = r.height;
+      const intersects = !(rx > minX + w || rx + rw < minX || ry > minY + h || ry + rh < minY);
+      if (intersects) {
+        const p = li.getAttribute("data-path");
+        if (p) hits.push(p);
+      }
+    }
+    if (dragStart.current.union) {
+      setSelected((prev) => new Set([...Array.from(prev), ...hits]));
+    } else {
+      setSelected(new Set(hits));
+    }
+  };
+
+  const onMouseUp = () => {
+    dragStart.current = null;
+    setDrag(null);
+  };
+
   return (
-    <div className="text-sm" tabIndex={0} onKeyDown={onKeyDown} aria-label="File tree">
+    <div
+      ref={containerRef}
+      className="text-sm relative"
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      aria-label="File tree"
+    >
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">Files</div>
         <div className="flex items-center gap-2">
@@ -469,8 +537,20 @@ export function FileTree() {
             <Button size="sm" onClick={applyCreate} title="Add">Add</Button>
           </li>
         )}
-        {tree.length > 0 ? tree.map(renderNode) : !creating && <li className="text-muted-foreground">No files yet</li>}
+        {tree.length > 0 ? tree.map((n) => {
+          if (n.type === "file") {
+            // ensure data-path on li via renderNode, fallback here if top-level
+            return <li key={n.path} data-path={n.path}>{renderNode(n)}</li>;
+          }
+          return renderNode(n);
+        }) : !creating && <li className="text-muted-foreground">No files yet</li>}
       </ul>
+      {drag && (
+        <div
+          className="absolute border-2 border-blue-400/60 bg-blue-400/10 pointer-events-none"
+          style={{ left: drag.x, top: drag.y, width: drag.w, height: drag.h }}
+        />
+      )}
       {menu && (
         <div
           className="fixed z-50 rounded-md border bg-card shadow-lg text-sm"

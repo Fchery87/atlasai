@@ -97,6 +97,23 @@ function EditorPanel() {
             />
             Format on save
           </label>
+          <Button
+            onClick={async () => {
+              if (!current || !currentFilePath) return;
+              const [{ formatContentAsync }, { languageFromPath: langFrom }] = await Promise.all([
+                import("./lib/editor/format"),
+                import("./lib/editor/lang"),
+              ]);
+              const l = langFrom(currentFilePath);
+              const formatted = await formatContentAsync(l, debouncedCode);
+              setCode(formatted);
+            }}
+            disabled={!currentFilePath}
+            title="Format Document"
+            variant="ghost"
+          >
+            Format
+          </Button>
           <Button onClick={onSave} disabled={!currentFilePath} title="Save (Ctrl/Cmd+S)">Save</Button>
           <Button variant="secondary" onClick={onStage} disabled={!canStage} title="Propose Change (Ctrl/Cmd+Enter)">Propose Change</Button>
           {staged && (
