@@ -345,6 +345,30 @@ export function ProviderManager() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        title="Duplicate custom provider"
+                        aria-label={`Duplicate ${p.def.name}`}
+                        onClick={() => {
+                          setEditId(null);
+                          setNewProv({
+                            id: `${p.def.id}-copy`,
+                            name: `${p.def.name} (copy)`,
+                            baseUrl: p.def.baseUrl,
+                            authType: (p.def.auth.type as any) ?? "apiKey",
+                            keyName: p.def.auth.keyName || "Authorization",
+                            models: (p.def.models || []).map(m => m.id).join(","),
+                          });
+                          const hdrs = p.def.headers || {};
+                          const rows = Object.keys(hdrs).map(k => ({ key: k, value: hdrs[k]! }));
+                          setHeaders(rows);
+                          setHeaderMask(rows.map(() => true));
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                      >
+                        Duplicate
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         title="Delete custom provider"
                         aria-label={`Delete ${p.def.name}`}
                         onClick={async () => {
