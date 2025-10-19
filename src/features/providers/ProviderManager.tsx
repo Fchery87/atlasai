@@ -7,6 +7,7 @@ import { ProviderDefinition } from "../../lib/providers/types";
 import { OpenRouterDef, OpenRouterAdapter } from "../../lib/providers/openrouter";
 import { OllamaDef, OllamaAdapter } from "../../lib/providers/ollama";
 import { loadProviderKey, saveProviderKey, clearProviderKey } from "../../lib/crypto/keys";
+import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
 type ProviderEntry = {
   def: ProviderDefinition;
@@ -29,6 +30,7 @@ function StatusBadge({ status }: { status?: "unknown" | "valid" | "invalid" }) {
 export function ProviderManager() {
   const [providers, setProviders] = React.useState<ProviderEntry[]>(initialProviders);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [showHelp, setShowHelp] = React.useState(false);
 
   React.useEffect(() => {
     // Load encrypted keys from storage
@@ -40,8 +42,15 @@ export function ProviderManager() {
         })
       );
       setProviders(entries);
+      const help = await loadDecrypted("sec_help_providers");
+      setShowHelp(help === "1");
     })();
   }, []);
+
+  React.useEffect(() => {
+    // Persist help toggle globally
+    saveEncrypted("sec_help_providers", showHelp ? "1" : "0");
+  }, [showHelp]);
 
   const validate = async (p: ProviderEntry) => {
     setBusy(p.def.id);
@@ -80,45 +89,72 @@ export function ProviderManager() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="Provider Manager">
-      {providers.map(p => (
-        <Card key={p.def.id}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="font-semibold">{p.def.name}</span>
-              <StatusBadge status={p.status} />
-            </CardTitle>
-            <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
-          </CardHeader>
-          <CardContent className="flex items-end gap-2">
-            {p.def.auth.type !== "none" ? (
-              <Input
-                aria-label={`${p.def.name} API key`}
-                placeholder={p.def.auth.type === "apiKey" ? "API Key" : "Bearer token"}
-                type="password"
-                value={p.key}
-                onChange={e => updateKey(p.def.id, e.currentTarget.value)}
-              />
-            ) : (
-              <div className="text-sm text-muted-foreground">No key required</div>
-            )}
-            <Button
-              onClick={() => save(p)}
-              variant="secondary"
-              disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
-            >
-              Save
-            </Button>
-            <Button
-              onClick={() => validate(p)}
-              disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
-              aria-busy={busy === p.def.id}
-            >
-              {busy === p.def.id ? "Validating..." : "Validate"}
-            </Button>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-3" aria-label="Provider Manager">
+      <div className="flex items-center justify-between">
+        <div className="font-medium">Providers</div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowHelp(v => !v)} aria-label="Providers help">?</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("sec_help_providers");
+              setShowHelp(false);
+            }}
+            aria-label="Reset Providers UI tips"
+            title="Reset Providers UI tips"
+          >
+            Reset UI Tips
+          </Button>
+        </div>
+      </div>
+      {showHelp && (
+        <div className="text-xs text-muted-foreground border rounded-md p-2">
+          - Enter API keys for providers you use (stored encrypted in your browser).<br />
+          - Validate to ensure the key works; Save to persist the key.<br />
+          - You can clear a key by saving an empty value or from browser storage controls.
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {providers.map(p => (
+          <Card key={p.def.id}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="font-semibold">{p.def.name}</span>
+                <StatusBadge status={p.status} />
+              </CardTitle>
+              <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
+            </CardHeader>
+            <CardContent className="flex items-end gap-2">
+              {p.def.auth.type !== "none" ? (
+                <Input
+                  aria-label={`${p.def.name} API key`}
+                  placeholder={p.def.auth.type === "apiKey" ? "API Key" : "Bearer token"}
+                  type="password"
+                  value={p.key}
+                  onChange={e => updateKey(p.def.id, e.currentTarget.value)}
+                />
+              ) : (
+                <div className="text-sm text-muted-foreground">No key required</div>
+              )}
+              <Button
+                onClick={() => save(p)}
+                variant="secondary"
+                disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+              >
+                Save
+              </Button>
+              <Button
+                onClick={() => validate(p)}
+                disabled={busy === p.def.id || (p.def.auth.type !== "none" && !p.key)}
+                aria-busy={busy === p.def.id}
+              >
+                {busy === p.def.id ? "Validating..." : "Validate"}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
