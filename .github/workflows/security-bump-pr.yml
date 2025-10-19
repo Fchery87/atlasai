@@ -1,0 +1,44 @@
+name: Security Bump PR
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit fix (non-force)
+        run: |
+          npm audit fix || true
+
+      - name: Show diffs
+        run: |
+          git status
+          git diff --name-only
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: security bump via npm audit fix"
+          title: "chore: security bump via npm audit fix"
+          body: |
+            This automated PR applies `npm audit fix` (non-force) to address vulnerabilities reported by npm audit.
+            Please review changes, especially any modifications to lockfiles.
+          branch: "chore/security-bump"
+          labels: "security,dependencies"
