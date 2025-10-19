@@ -76,6 +76,7 @@ export function FileTree() {
   const renameInputRef = React.useRef<HTMLInputElement>(null);
 
   const [creating, setCreating] = React.useState<boolean>(false);
+  const [creatingPath, setCreatingPath] = React.useState<string | null>(null); // "" for top-level, or folder path
   const [createValue, setCreateValue] = React.useState<string>("");
   const createInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -118,14 +119,17 @@ export function FileTree() {
     await snapshot(label);
   };
 
-  const startCreate = (prefill = "") => {
+  const startCreate = (prefill = "", atPath: string | null = "") => {
     setCreateValue(prefill);
+    setCreatingPath(atPath);
     setCreating(true);
   };
 
   const applyCreate = async () => {
     const raw = createValue.trim();
+    const parent = creatingPath;
     setCreating(false);
+    setCreatingPath(null);
     if (!raw) return;
     const path = raw.endsWith("/") ? raw + "untitled.txt" : raw;
     try {
@@ -213,15 +217,16 @@ export function FileTree() {
               onClick={() => selectFile(node.path)}
               className={`text-left flex-1 rounded px-2 py-1 hover:bg-muted ${currentFilePath === node.path ? "bg-muted" : ""}`}
               aria-label={`Open ${node.path}`}
+              title="Open"
             >
               {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}
             </button>
           )}
           <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" aria-label={`Rename ${node.path}`} onClick={() => startRename(node.path)}>
+            <Button size="sm" variant="ghost" aria-label={`Rename ${node.path}`} onClick={() => startRename(node.path)} title="Rename (F2)">
               ✎
             </Button>
-            <Button size="sm" variant="ghost" aria-label={`Delete ${node.path}`} onClick={() => onDelete(node.path)}>
+            <Button size="sm" variant="ghost" aria-label={`Delete ${node.path}`} onClick={() => onDelete(node.path)} title="Delete (Del/Backspace)">
               ✕
             </Button>
           </div>
@@ -241,16 +246,42 @@ export function FileTree() {
               setMenu({ x: e.clientX, y: e.clientY, path: node.path });
             }}
             aria-label={`Toggle ${node.name}`}
+            title={isOpen ? "Collapse" : "Expand"}
           >
             {isOpen ? "📂" : "📁"} {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}
           </button>
           <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" aria-label={`New in ${node.path}`} onClick={() => startCreate(node.path + "/")}>
+            <Button size="sm" variant="ghost" aria-label={`New in ${node.path}`} onClick={() => startCreate(node.path + "/", node.path)} title="New here">
               ＋
             </Button>
           </div>
         </div>
-        {isOpen && node.children.length > 0 && <ul className="ml-4 space-y-1">{node.children.map(renderNode)}</ul>}
+        {isOpen && (
+          <ul className="ml-4 space-y-1">
+            {creating && creatingPath === node.path && (
+              <li className="flex items-center gap-2">
+                <input
+                  ref={createInputRef}
+                  value={createValue}
+                  onChange={(e) => setCreateValue(e.currentTarget.value)}
+                  onBlur={applyCreate}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyCreate();
+                    if (e.key === "Escape") {
+                      setCreating(false);
+                      setCreatingPath(null);
+                    }
+                  }}
+                  placeholder="path/to/file.ext or folder/"
+                  className="flex-1 h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label={`New file in ${node.path}`}
+                />
+                <Button size="sm" onClick={applyCreate} title="Add">Add</Button>
+              </li>
+            )}
+            {node.children.map(renderNode)}
+          </ul>
+        )}
       </li>
     );
   };
@@ -260,9 +291,9 @@ export function FileTree() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">Files</div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => startCreate()} aria-label="Create file">New</Button>
-          <Button size="sm" variant="secondary" onClick={() => startCreate("folder/")} aria-label="Create folder">New Folder</Button>
-          <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot">Snapshot</Button>
+          <Button size="sm" variant="secondary" onClick={() => startCreate("", "")} aria-label="Create file" title="New (Ctrl/Cmd+N)">New</Button>
+          <Button size="sm" variant="secondary" onClick={() => startCreate("folder/", "")} aria-label="Create folder" title="New Folder">New Folder</Button>
+          <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot" title="Create Snapshot">Snapshot</Button>
         </div>
       </div>
       <div className="mb-2">
@@ -275,7 +306,7 @@ export function FileTree() {
         />
       </div>
       <ul className="space-y-1">
-        {creating && (
+        {creating && creatingPath === "" && (
           <li className="flex items-center gap-2">
             <input
               ref={createInputRef}
@@ -284,13 +315,16 @@ export function FileTree() {
               onBlur={applyCreate}
               onKeyDown={(e) => {
                 if (e.key === "Enter") applyCreate();
-                if (e.key === "Escape") setCreating(false);
+                if (e.key === "Escape") {
+                  setCreating(false);
+                  setCreatingPath(null);
+                }
               }}
               placeholder="path/to/file.ext or folder/"
               className="flex-1 h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="New file path"
             />
-            <Button size="sm" onClick={applyCreate}>Add</Button>
+            <Button size="sm" onClick={applyCreate} title="Add">Add</Button>
           </li>
         )}
         {tree.length > 0 ? tree.map(renderNode) : !creating && <li className="text-muted-foreground">No files yet</li>}

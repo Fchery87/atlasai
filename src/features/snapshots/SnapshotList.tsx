@@ -95,8 +95,15 @@ export function SnapshotList() {
                 <div>Removed ({summary.removed.length})</div>
                 <ul className="mb-2">
                   {summary.removed.map((p) => (
-                    <li key={"r-" + p} className="text-muted-foreground">
-                      {p} (cannot preview delete)
+                    <li key={"r-" + p}>
+                      <button
+                        className="underline hover:no-underline text-red-600"
+                        onClick={() => stageDiff(p)}
+                        aria-label={`Stage delete ${p}`}
+                        title="Stage delete (Approve to remove file)"
+                      >
+                        {p} — stage delete
+                      </button>
                     </li>
                   ))}
                 </ul>

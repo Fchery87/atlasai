@@ -97,12 +97,12 @@ function EditorPanel() {
             />
             Format on save
           </label>
-          <Button onClick={onSave} disabled={!currentFilePath}>Save</Button>
-          <Button variant="secondary" onClick={onStage} disabled={!canStage}>Propose Change</Button>
+          <Button onClick={onSave} disabled={!currentFilePath} title="Save (Ctrl/Cmd+S)">Save</Button>
+          <Button variant="secondary" onClick={onStage} disabled={!canStage} title="Propose Change (Ctrl/Cmd+Enter)">Propose Change</Button>
           {staged && (
             <>
-              <Button onClick={approveDiff} disabled={fileLock}>Approve</Button>
-              <Button variant="ghost" onClick={rejectDiff}>Reject</Button>
+              <Button onClick={approveDiff} disabled={fileLock} title="Approve (Shift+Ctrl/Cmd+Enter)">Approve</Button>
+              <Button variant="ghost" onClick={rejectDiff} title="Reject (Esc)">Reject</Button>
             </>
           )}
         </div>
@@ -230,7 +230,7 @@ function TerminalPanel() {
       <CardHeader className="justify-between">
         <CardTitle>Terminal</CardTitle>
         <div className="ml-auto flex gap-2">
-          <Button variant="secondary" onClick={clear} aria-label="Clear terminal">Clear</Button>
+          <Button variant="secondary" onClick={clear} aria-label="Clear terminal" title="Clear">Clear</Button>
         </div>
       </CardHeader>
       <CardContent className="grow">
