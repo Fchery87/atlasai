@@ -21,6 +21,18 @@ function Header() {
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
+            title="Reset workbench pane sizes to default"
+            aria-label="Reset workbench layout"
+            onClick={() => {
+              const sizes = [26, 38, 36];
+              localStorage.setItem("bf_split_workbench", JSON.stringify(sizes));
+              window.dispatchEvent(new CustomEvent("bf:split-reset", { detail: { key: "bf_split_workbench", sizes } }));
+            }}
+          >
+            Reset Layout
+          </Button>
+          <Button
+            variant="ghost"
             title="Reset all UI tips across the app"
             aria-label="Reset all UI tips"
             onClick={() => {
@@ -244,6 +256,20 @@ function ChatPanel() {
     return bundle ? bundle.adapter.capabilities(bundle.def) : { vision: false, tools: false };
   }, [registry, providerId]);
 
+  // Auto-enable images toggle when switching to a vision-capable provider, and auto-disable otherwise
+  const [imageHint, setImageHint] = React.useState<string>("");
+  React.useEffect(() => {
+    if (providerCaps.vision) {
+      setIncludeImagesAsDataUrl(true);
+      setImageHint("Images enabled for this provider.");
+      const t = setTimeout(() => setImageHint(""), 2500);
+      return () => clearTimeout(t);
+    } else {
+      setIncludeImagesAsDataUrl(false);
+      setImageHint("");
+    }
+  }, [providerCaps.vision]);
+
   const modelsForProvider = React.useMemo(() => {
     const bundle = registry[providerId];
     return bundle?.def.models?.map((m: any) => m.id) ?? [];
@@ -444,7 +470,10 @@ function ChatPanel() {
               Use current file as target
             </label>
           </div>
-          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">{status}</div>
+          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">
+            {imageHint ? <span className="mr-2">{imageHint}</span> : null}
+            {status}
+          </div>
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
