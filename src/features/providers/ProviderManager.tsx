@@ -141,6 +141,7 @@ export function ProviderManager() {
   const [headers, setHeaders] = React.useState<Array<{ key: string; value: string }>>([]);
   const [headerMask, setHeaderMask] = React.useState<boolean[]>([]);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [editId, setEditId] = React.useState<string | null>(null);
 
   const CustomDefSchema = z.object({
     id: z.string().min(1, "ID is required"),
@@ -220,12 +221,22 @@ export function ProviderManager() {
     // Persist custom headers encrypted under per-provider key
     if (Object.keys(headerObj).length) {
       await saveEncrypted(`sec_provider_headers:${id}`, JSON.stringify(headerObj));
+    } else {
+      localStorage.removeItem(`sec_provider_headers:${id}`);
     }
-    // Append to UI list with merged headers in-memory
-    setProviders((prev) => [...prev, { def: { ...def, headers: Object.keys(headerObj).length ? headerObj : undefined }, key: "", status: "unknown" }]);
+    // Update UI list: replace if editing, else append
+    setProviders((prev) => {
+      const mergedDef = { ...def, headers: Object.keys(headerObj).length ? headerObj : undefined };
+      if (editId && prev.some(e => e.def.id === editId)) {
+        return prev.map(e => (e.def.id === editId ? { ...e, def: mergedDef } : e));
+      }
+      return [...prev, { def: mergedDef, key: "", status: "unknown" }];
+    });
     // Reset form
+    setEditId(null);
     setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
     setHeaders([]);
+    setHeaderMask([]);
   };
 
   return (
@@ -267,29 +278,57 @@ export function ProviderManager() {
                   <span className="font-semibold">{p.def.name}</span>
                   <StatusBadge status={p.status} />
                   {!isBuiltin && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      title="Delete custom provider"
-                      aria-label={`Delete ${p.def.name}`}
-                      onClick={async () => {
-                        if (!confirm(`Delete provider '${p.def.name}'?`)) return;
-                        // remove from local provider list
-                        setProviders(prev => prev.filter(e => e.def.id !== p.def.id));
-                        // remove from persisted bf_custom_providers
-                        const raw = localStorage.getItem("bf_custom_providers");
-                        try {
-                          const list: ProviderDefinition[] = raw ? JSON.parse(raw) : [];
-                          const filtered = list.filter((d: any) => d.id !== p.def.id);
-                          localStorage.setItem("bf_custom_providers", JSON.stringify(filtered));
-                        } catch {}
-                        // remove encrypted headers and key
-                        localStorage.removeItem(`sec_provider_headers:${p.def.id}`);
-                        clearProviderKey(p.def.id);
-                      }}
-                    >
-                      Delete
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Edit custom provider"
+                        aria-label={`Edit ${p.def.name}`}
+                        onClick={() => {
+                          setEditId(p.def.id);
+                          setNewProv({
+                            id: p.def.id,
+                            name: p.def.name,
+                            baseUrl: p.def.baseUrl,
+                            authType: (p.def.auth.type as any) ?? "apiKey",
+                            keyName: p.def.auth.keyName || "Authorization",
+                            models: (p.def.models || []).map(m => m.id).join(","),
+                          });
+                          const hdrs = p.def.headers || {};
+                          const rows = Object.keys(hdrs).map(k => ({ key: k, value: hdrs[k]! }));
+                          setHeaders(rows);
+                          setHeaderMask(rows.map(() => true));
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Delete custom provider"
+                        aria-label={`Delete ${p.def.name}`}
+                        onClick={async () => {
+                          if (!confirm(`Delete provider '${p.def.name}'?`)) return;
+                          // remove from local provider list
+                          setProviders(prev => prev.filter(e => e.def.id !== p.def.id));
+                          // remove from persisted bf_custom_providers
+                          const raw = localStorage.getItem("bf_custom_providers");
+                          try {
+                            const list: ProviderDefinition[] = raw ? JSON.parse(raw) : [];
+                            const filtered = list.filter((d: any) => d.id !== p.def.id);
+                            localStorage.setItem("bf_custom_providers", JSON.stringify(filtered));
+                          } catch {}
+                          // remove encrypted headers and key
+                          localStorage.removeItem(`sec_provider_headers:${p.def.id}`);
+                          clearProviderKey(p.def.id);
+                          // If we were editing this one, reset form
+                          setEditId(prev => (prev === p.def.id ? null : prev));
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </>
                   )}
                 </CardTitle>
                 <div className="text-xs text-muted-foreground">{p.def.baseUrl}</div>
@@ -399,13 +438,29 @@ export function ProviderManager() {
             variant="secondary"
             onClick={addCustomProvider}
             disabled={!newProv.baseUrl.trim() || !newProv.name.trim()}
-            aria-label="Add custom provider"
+            aria-label={editId ? "Save changes" : "Add custom provider"}
+            title={editId ? "Save changes to this provider" : "Add custom provider"}
           >
-            Add Provider
+            {editId ? "Save Changes" : "Add Provider"}
           </Button>
+          {editId && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditId(null);
+                setNewProv({ id: "", name: "", baseUrl: "", authType: "apiKey", keyName: "Authorization", models: "" });
+                setHeaders([]);
+                setHeaderMask([]);
+              }}
+              aria-label="Cancel edit"
+              title="Cancel editing"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
         <div className="text-xs text-muted-foreground">
-          Note: validation uses GET /models; streaming uses POST /chat/completions with stream=true.
+          {editId ? `Editing provider '${editId}'.` : "Note: validation uses GET /models; streaming uses POST /chat/completions with stream=true."}
         </div>
       </div>
     </div>
