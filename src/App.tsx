@@ -210,6 +210,7 @@ function ChatPanel() {
   const [contextExpanded, setContextExpanded] = React.useState<boolean>(false);
   const [attachments, setAttachments] = React.useState<Array<{ name: string; type: string; size: number; text?: string; note?: string }>>([]);
   const [maxAttachmentChars, setMaxAttachmentChars] = React.useState<number>(8000);
+  const [includeImagesAsDataUrl, setIncludeImagesAsDataUrl] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     if (currentFilePath) {
@@ -237,6 +238,11 @@ function ChatPanel() {
       gpt5: { def: GPT5Def, adapter: GPT5Adapter, needsKey: false },
     };
   }, []);
+
+  const providerCaps = React.useMemo(() => {
+    const bundle = registry[providerId];
+    return bundle ? bundle.adapter.capabilities(bundle.def) : { vision: false, tools: false };
+  }, [registry, providerId]);
 
   const modelsForProvider = React.useMemo(() => {
     const bundle = registry[providerId];
@@ -458,16 +464,25 @@ function ChatPanel() {
               aria-label="Attach files"
               type="file"
               multiple
+              accept=""
               onChange={async (e) => {
                 const files = Array.from(e.currentTarget.files || []);
                 const newItems: Array<{ name: string; type: string; size: number; text?: string; note?: string }> = [];
                 for (const f of files) {
+                  const isImage = f.type.startsWith("image/");
                   const isText = f.type.startsWith("text/") || [".js",".ts",".tsx",".jsx",".json",".css",".html",".md",".yml",".yaml",".py",".sh",".bash"].some(ext => f.name.endsWith(ext));
                   if (isText) {
                     const txt = await f.text();
                     const sliced = txt.slice(0, maxAttachmentChars);
                     const note = txt.length > maxAttachmentChars ? `truncated to ${sliced.length} of ${txt.length} chars` : undefined;
                     newItems.push({ name: f.name, type: f.type || "text/plain", size: f.size, text: sliced, note });
+                  } else if (isImage && includeImagesAsDataUrl && providerCaps.vision) {
+                    const buf = await new Promise<string>((resolve) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result as string);
+                      reader.readAsDataURL(f);
+                    });
+                    newItems.push({ name: f.name, type: f.type || "image/*", size: f.size, text: buf, note: "included as data URL" });
                   } else {
                     newItems.push({ name: f.name, type: f.type || "application/octet-stream", size: f.size, note: "binary/image omitted" });
                   }
@@ -488,6 +503,16 @@ function ChatPanel() {
                 onChange={(e) => setMaxAttachmentChars(Math.max(0, Number(e.currentTarget.value || 0)))}
                 aria-label="Max attachment characters"
               />
+            </label>
+            <label className="text-xs flex items-center gap-2" title={providerCaps.vision ? "Include images as data URLs" : "Provider does not support vision"}>
+              <input
+                type="checkbox"
+                checked={includeImagesAsDataUrl}
+                onChange={(e) => setIncludeImagesAsDataUrl(e.currentTarget.checked)}
+                disabled={!providerCaps.vision}
+                aria-label="Include images as data URLs"
+              />
+              Include images
             </label>
             {attachments.length > 0 && (
               <Button variant="ghost" size="sm" aria-label="Clear attachments" onClick={() => setAttachments([])}>Clear attachments</Button>

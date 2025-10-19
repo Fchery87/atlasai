@@ -39,6 +39,18 @@ export function SplitPane({
     onSizesChange?.(localSizes);
   }, [localSizes]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Listen for external reset events
+  React.useEffect(() => {
+    const onReset = (e: Event) => {
+      const ce = e as CustomEvent<{ key: string; sizes: number[] }>;
+      if (storageKey && ce.detail?.key === storageKey && Array.isArray(ce.detail.sizes)) {
+        setLocalSizes(ce.detail.sizes);
+      }
+    };
+    window.addEventListener("bf:split-reset", onReset as EventListener);
+    return () => window.removeEventListener("bf:split-reset", onReset as EventListener);
+  }, [storageKey]);
+
   const isVertical = dir === "vertical";
 
   const startPosRef = React.useRef<number>(0);
@@ -46,10 +58,14 @@ export function SplitPane({
   const dragIndexRef = React.useRef<number | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const onMouseDown = (idx: number, e: React.MouseEvent) => {
+  const beginDrag = (idx: number, clientXY: number) => {
     dragIndexRef.current = idx;
-    startPosRef.current = isVertical ? e.clientX : e.clientY;
+    startPosRef.current = clientXY;
     startSizesRef.current = [...localSizes];
+  };
+
+  const onMouseDown = (idx: number, e: React.MouseEvent) => {
+    beginDrag(idx, isVertical ? e.clientX : e.clientY);
     window.addEventListener("mousemove", onMouseMove as any);
     window.addEventListener("mouseup", onMouseUp as any);
     e.preventDefault();
@@ -61,20 +77,21 @@ export function SplitPane({
     const currentPos = isVertical ? e.clientX : e.clientY;
     const totalPx = isVertical ? rect.width : rect.height;
     const deltaPx = currentPos - startPosRef.current;
+    applyDelta(deltaPx, totalPx);
+  };
+
+  const applyDelta = (deltaPx: number, totalPx: number) => {
+    if (dragIndexRef.current === null) return;
     const deltaPct = (deltaPx / totalPx) * 100;
     const i = dragIndexRef.current;
-
-    // Adjust sizes[i] and sizes[i+1]
     const next = [...startSizesRef.current];
     let a = Math.max(minSizePct, next[i] + deltaPct);
     let b = Math.max(minSizePct, next[i + 1] - deltaPct);
     const rest = next.reduce((sum, v, idx) => (idx === i || idx === i + 1 ? sum : sum + v), 0);
-    // Normalize a and b so total remains 100 - rest
     const remaining = Math.max(0, 100 - rest);
     const scale = (a + b) > 0 ? remaining / (a + b) : 1;
     a = a * scale;
     b = b * scale;
-
     next[i] = a;
     next[i + 1] = b;
     setLocalSizes(next);
@@ -84,6 +101,35 @@ export function SplitPane({
     dragIndexRef.current = null;
     window.removeEventListener("mousemove", onMouseMove as any);
     window.removeEventListener("mouseup", onMouseUp as any);
+  };
+
+  const onKeyDownHandle = (idx: number, e: React.KeyboardEvent) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const totalPx = isVertical ? rect.width : rect.height;
+    const stepPct = 2; // 2% per keypress
+    const stepPx = (stepPct / 100) * totalPx;
+    if (isVertical) {
+      if (e.key === "ArrowLeft") {
+        beginDrag(idx, 0);
+        applyDelta(-stepPx, totalPx);
+        e.preventDefault();
+      } else if (e.key === "ArrowRight") {
+        beginDrag(idx, 0);
+        applyDelta(stepPx, totalPx);
+        e.preventDefault();
+      }
+    } else {
+      if (e.key === "ArrowUp") {
+        beginDrag(idx, 0);
+        applyDelta(-stepPx, totalPx);
+        e.preventDefault();
+      } else if (e.key === "ArrowDown") {
+        beginDrag(idx, 0);
+        applyDelta(stepPx, totalPx);
+        e.preventDefault();
+      }
+    }
   };
 
   const styleFor = (pct: number) =>
@@ -107,8 +153,9 @@ export function SplitPane({
               aria-orientation={isVertical ? "vertical" : "horizontal"}
               tabIndex={0}
               onMouseDown={(e) => onMouseDown(idx, e)}
+              onKeyDown={(e) => onKeyDownHandle(idx, e)}
               className={handleStyle}
-              title="Drag to resize"
+              title="Drag to resize (Arrow keys to resize)"
             />
           )}
         </React.Fragment>

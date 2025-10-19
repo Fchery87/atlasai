@@ -32,6 +32,16 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const commands: Command[] = [
     {
+      id: "reset-split",
+      label: "Reset Workbench Split",
+      hint: "Reset pane sizes",
+      run: async () => {
+        const sizes = [26, 38, 36];
+        localStorage.setItem("bf_split_workbench", JSON.stringify(sizes));
+        window.dispatchEvent(new CustomEvent("bf:split-reset", { detail: { key: "bf_split_workbench", sizes } }));
+      },
+    },
+    {
       id: "new-file",
       label: "New File",
       hint: "Ctrl/Cmd+N in Files",
