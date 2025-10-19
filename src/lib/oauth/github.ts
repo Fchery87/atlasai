@@ -1,4 +1,5 @@
 const OAUTH_AUTHORIZE = "https://github.com/login/oauth/authorize";
+import { encryptString, decryptString } from "../crypto/keys";
 
 function base64url(bytes: ArrayBuffer) {
   const str = btoa(String.fromCharCode(...new Uint8Array(bytes)));
@@ -15,6 +16,25 @@ function randString(len = 32) {
   const arr = new Uint8Array(len);
   crypto.getRandomValues(arr);
   return base64url(arr);
+}
+
+const SEC_TOKEN = "sec_gh_access_token";
+const SEC_CLIENT_ID = "sec_gh_client_id";
+const SEC_WORKER_URL = "sec_gh_worker_url";
+
+export async function saveEncrypted(key: string, val: string) {
+  const enc = await encryptString(val);
+  localStorage.setItem(key, enc);
+}
+
+export async function loadDecrypted(key: string): Promise<string | undefined> {
+  const enc = localStorage.getItem(key);
+  if (!enc) return undefined;
+  try {
+    return await decryptString(enc);
+  } catch {
+    return undefined;
+  }
 }
 
 export type GitHubAuthConfig = {
@@ -78,14 +98,24 @@ export async function completeGitHubOAuth(): Promise<{ access_token?: string; er
   sessionStorage.removeItem("gh_redirect_uri");
   sessionStorage.removeItem("gh_worker_callback");
 
-  localStorage.setItem("gh_access_token", data.access_token);
+  await saveEncrypted(SEC_TOKEN, data.access_token);
   return { access_token: data.access_token };
 }
 
-export function getGitHubToken(): string | null {
-  return localStorage.getItem("gh_access_token");
+export async function getGitHubToken(): Promise<string | null> {
+  return (await loadDecrypted(SEC_TOKEN)) || null;
 }
 
 export function clearGitHubToken() {
-  localStorage.removeItem("gh_access_token");
+  localStorage.removeItem(SEC_TOKEN);
+}
+
+export async function saveGitHubClientConfig(clientId: string, workerUrl: string) {
+  await saveEncrypted(SEC_CLIENT_ID, clientId);
+  await saveEncrypted(SEC_WORKER_URL, workerUrl);
+}
+
+export async function loadGitHubClientConfig(): Promise<{ clientId?: string; workerUrl?: string }> {
+  const [clientId, workerUrl] = await Promise.all([loadDecrypted(SEC_CLIENT_ID), loadDecrypted(SEC_WORKER_URL)]);
+  return { clientId, workerUrl };
 }

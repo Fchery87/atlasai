@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
-import { startGitHubOAuth, completeGitHubOAuth, getGitHubToken, clearGitHubToken } from "../../lib/oauth/github";
+import { startGitHubOAuth, completeGitHubOAuth, getGitHubToken, clearGitHubToken, saveGitHubClientConfig, loadGitHubClientConfig } from "../../lib/oauth/github";
 
 function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
@@ -20,17 +20,27 @@ export function GitPanel() {
   const [repoUrl, setRepoUrl] = React.useState("");
   const [branch, setBranch] = React.useState("main");
   const [status, setStatus] = React.useState("Idle");
-  const [ghClientId, setGhClientId] = React.useState<string>(() => localStorage.getItem("gh_client_id") || "");
-  const [workerUrl, setWorkerUrl] = React.useState<string>(() => localStorage.getItem("gh_worker_url") || "");
-  const [token, setToken] = React.useState<string | null>(getGitHubToken());
+  const [ghClientId, setGhClientId] = React.useState<string>("");
+  const [workerUrl, setWorkerUrl] = React.useState<string>("");
+  const [token, setToken] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    // Persist config
-    localStorage.setItem("gh_client_id", ghClientId);
-  }, [ghClientId]);
+    // Load encrypted config and token
+    (async () => {
+      const cfg = await loadGitHubClientConfig();
+      if (cfg.clientId) setGhClientId(cfg.clientId);
+      if (cfg.workerUrl) setWorkerUrl(cfg.workerUrl);
+      const t = await getGitHubToken();
+      setToken(t);
+    })();
+  }, []);
+
   React.useEffect(() => {
-    localStorage.setItem("gh_worker_url", workerUrl);
-  }, [workerUrl]);
+    // Persist config encrypted
+    if (ghClientId || workerUrl) {
+      saveGitHubClientConfig(ghClientId, workerUrl);
+    }
+  }, [ghClientId, workerUrl]);
 
   React.useEffect(() => {
     // Handle OAuth callback if code present
