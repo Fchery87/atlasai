@@ -19,7 +19,8 @@ type State = {
 
   currentFilePath?: string;
   staged?: StagedDiff;
-  lastApplied?: StagedDiff;
+  undoStack: StagedDiff[];
+  redoStack: StagedDiff[];
   fileLock: boolean;
   previewHtml?: string;
 };
@@ -109,6 +110,8 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
   projects: [],
   loading: false,
   fileLock: false,
+  undoStack: [],
+  redoStack: [],
   previewHtml: undefined,
 
   async loadProjects() {
@@ -244,7 +247,8 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       } else {
         await get().upsertFile(state.staged.path, state.staged.after);
       }
-      set({ lastApplied: state.staged, staged: undefined });
+      // push to undo stack and clear redo
+      set({ undoStack: [...get().undoStack, state.staged], redoStack: [], staged: undefined });
     } finally {
       set({ fileLock: false });
     }
@@ -252,8 +256,8 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
 
   async undoLastApply() {
     const state = get();
-    if (!state.current || !state.lastApplied) return;
-    const la = state.lastApplied;
+    if (!state.current || get().undoStack.length === 0) return;
+    const la = get().undoStack[get().undoStack.length - 1];
     if (la.op === "delete") {
       // bring file back with before content
       await get().upsertFile(la.path, la.before);
@@ -264,7 +268,19 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       // modify: restore before
       await get().upsertFile(la.path, la.before);
     }
-    set({ lastApplied: undefined });
+    set({ undoStack: get().undoStack.slice(0, -1), redoStack: [...get().redoStack, la] });
+  },
+
+  async redoLastApply() {
+    const state = get();
+    if (!state.current || get().redoStack.length === 0) return;
+    const ra = get().redoStack[get().redoStack.length - 1];
+    if (ra.op === "delete") {
+      await get().deleteFile(ra.path);
+    } else {
+      await get().upsertFile(ra.path, ra.after);
+    }
+    set({ redoStack: get().redoStack.slice(0, -1), undoStack: [...get().undoStack, ra] });
   },
 
   rejectDiff() {

@@ -59,7 +59,7 @@ function Header() {
 }
 
 function EditorPanel() {
-  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock, lastApplied, undoLastApply } = useProjectStore();
+  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock, undoStack, redoStack, undoLastApply, redoLastApply } = useProjectStore();
   const file = current?.files.find((f) => f.path === currentFilePath);
   const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
   const debouncedCode = useDebounced(code, 150);
@@ -154,8 +154,15 @@ function EditorPanel() {
               <Button variant="ghost" onClick={rejectDiff} title="Reject (Esc)">Reject</Button>
             </>
           )}
-          {!staged && lastApplied && (
-            <Button variant="ghost" onClick={undoLastApply} title="Undo last apply">Undo last apply</Button>
+          {!staged && (undoStack.length > 0 || redoStack.length > 0) && (
+            <div className="flex items-center gap-2">
+              {undoStack.length > 0 && (
+                <Button variant="ghost" onClick={undoLastApply} title="Undo last apply">Undo</Button>
+              )}
+              {redoStack.length > 0 && (
+                <Button variant="ghost" onClick={redoLastApply} title="Redo last apply">Redo</Button>
+              )}
+            </div>
           )}
         </div>
       </CardHeader>
