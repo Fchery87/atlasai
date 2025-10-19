@@ -2,7 +2,7 @@ import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
 import JSZip from "jszip";
-import { getGitHubToken } from "../../lib/oauth/github";
+import { getGitHubToken, saveEncrypted, loadDecrypted } from "../../lib/oauth/github";
 
 type DeployTarget = "github-pages" | "netlify" | "vercel";
 
@@ -20,6 +20,39 @@ export function DeployPanel() {
   const [vercelBuildCmd, setVercelBuildCmd] = React.useState<string>("npm run build");
   const [vercelOutDir, setVercelOutDir] = React.useState<string>("dist");
 
+  // Load persisted tokens/config
+  React.useEffect(() => {
+    (async () => {
+      const [nlTok, nlSite, vcTok, vcProject, vcFramework, vcBuild, vcOut] = await Promise.all([
+        loadDecrypted("sec_netlify_token"),
+        loadDecrypted("sec_netlify_site"),
+        loadDecrypted("sec_vercel_token"),
+        loadDecrypted("sec_vercel_project"),
+        loadDecrypted("sec_vercel_framework"),
+        loadDecrypted("sec_vercel_build_cmd"),
+        loadDecrypted("sec_vercel_out_dir"),
+      ]);
+      if (nlTok) setNetlifyToken(nlTok);
+      if (nlSite) setNetlifySiteId(nlSite);
+      if (vcTok) setVercelToken(vcTok);
+      if (vcProject) setVercelProject(vcProject);
+      if (vcFramework) setVercelFramework(vcFramework);
+      if (vcBuild) setVercelBuildCmd(vcBuild);
+      if (vcOut) setVercelOutDir(vcOut);
+      const repo = await loadDecrypted("sec_github_pages_repo");
+      if (repo) setGhRepo(repo);
+    })();
+  }, []);
+
+  React.useEffect(() => { if (netlifyToken) saveEncrypted("sec_netlify_token", netlifyToken); }, [netlifyToken]);
+  React.useEffect(() => { if (netlifySiteId) saveEncrypted("sec_netlify_site", netlifySiteId); }, [netlifySiteId]);
+  React.useEffect(() => { if (vercelToken) saveEncrypted("sec_vercel_token", vercelToken); }, [vercelToken]);
+  React.useEffect(() => { if (vercelProject) saveEncrypted("sec_vercel_project", vercelProject); }, [vercelProject]);
+  React.useEffect(() => { if (vercelFramework) saveEncrypted("sec_vercel_framework", vercelFramework); }, [vercelFramework]);
+  React.useEffect(() => { if (vercelBuildCmd) saveEncrypted("sec_vercel_build_cmd", vercelBuildCmd); }, [vercelBuildCmd]);
+  React.useEffect(() => { if (vercelOutDir) saveEncrypted("sec_vercel_out_dir", vercelOutDir); }, [vercelOutDir]);
+  React.useEffect(() => { if (ghRepo) saveEncrypted("sec_github_pages_repo", ghRepo); }, [ghRepo]);
+
   const log = (line: string) => setLogs((l) => [...l, line]);
 
   const [useDist, setUseDist] = React.useState<boolean>(true);
@@ -36,9 +69,9 @@ export function DeployPanel() {
   }, [current, useDist]);
 
   const deployGitHubPages = async () => {
-    const token = getGitHubToken();
+    const token = await getGitHubToken();
     if (!current || !ghRepo || !token) {
-      setStatus("Provide owner/repo and sign in to GitHub");
+      setStatuside owner/repo and sign in to GitHub");
       return;
     }
     const [owner, repo] = ghRepo.split("/");
@@ -300,6 +333,60 @@ export function DeployPanel() {
           {logs.map((l, i) => (
             <div key={i}>{l}</div>
           ))}
+        </div>
+        <div className="mt-3">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              const content = `name: Build and Deploy to GitHub Pages
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+`;
+              const blob = new Blob([content], { type: "text/yaml" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "gh-pages.yml";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            aria-label="Download GitHub Pages workflow"
+            title="Download GitHub Pages workflow"
+          >
+            Download GH Pages Workflow
+          </Button>
         </div>
       </div>
     </div>
