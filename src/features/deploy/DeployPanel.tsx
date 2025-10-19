@@ -36,6 +36,7 @@ export function DeployPanel() {
   const [ghHelp, setGhHelp] = React.useState(false);
   const [netlifyHelp, setNetlifyHelp] = React.useState(false);
   const [vercelHelp, setVercelHelp] = React.useState(false);
+  const [hideDistBanner, setHideDistBanner] = React.useState(false);
 
   // Load persisted tokens/config per-project with global fallback
   React.useEffect(() => {
@@ -59,6 +60,16 @@ export function DeployPanel() {
       setDefaultBranch(def);
       setCiBranch(def);
       setUserRepoBranch(def);
+
+      // Load UI prefs
+      const hide = await loadDecrypted(nsKey(pid, "sec_hide_dist_banner"));
+      setHideDistBanner(hide === "1");
+      const gh = await loadDecrypted(nsKey(pid, "sec_help_gh"));
+      const nl = await loadDecrypted(nsKey(pid, "sec_help_netlify"));
+      const vc = await loadDecrypted(nsKey(pid, "sec_help_vercel"));
+      setGhHelp(gh === "1");
+      setNetlifyHelp(nl === "1");
+      setVercelHelp(vc === "1");
     })();
   }, [pid]);
 
@@ -72,11 +83,15 @@ export function DeployPanel() {
   React.useEffect(() => { if (vercelOutDir) saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir); }, [vercelOutDir, pid]);
   React.useEffect(() => { if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo); }, [ghRepo, pid]);
   React.useEffect(() => { if (defaultBranch) saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch); }, [defaultBranch, pid]);
+  // Persist UI prefs
+  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_gh"), ghHelp ? "1" : "0"); }, [ghHelp, pid]);
+  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_netlify"), netlifyHelp ? "1" : "0"); }, [netlifyHelp, pid]);
+  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_vercel"), vercelHelp ? "1" : "0"); }, [vercelHelp, pid]);
 
   const distMissing = React.useMemo(() => {
-    if (!current || !useDist) return false;
+    if (!current || !useDist || hideDistBanner) return false;
     return !current.files.some((f) => f.path.startsWith("dist/"));
-  }, [current, useDist]);
+  }, [current, useDist, hideDistBanner]);
 
   const filesForDeploy = React.useCallback(() => {
     if (!current) return [];
@@ -263,11 +278,7 @@ export function DeployPanel() {
 
   return (
     <div className="space-y-2 text-sm">
-      {distMissing && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2" role="status" aria-live="polite">
-          dist/ folder not found. The deploy will use project files. Run your build locally (npm run build) to generate dist/, or use the CI workflow generator below.
-        </div>
-      )}
+      
       <div className="flex items-center gap-3">
         <label className="text-xs flex items-center gap-1">
           <input type="checkbox" checked={useDist} onChange={(e) => setUseDist(e.currentTarget.checked)} aria-label="Use dist/ folder if present" />
@@ -290,11 +301,27 @@ export function DeployPanel() {
       </div>
       {distMissing && (
         <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2 text-xs" role="status" aria-live="polite">
-          No dist/ files detected. You can:
-          <ul className="list-disc list-inside">
-            <li>Uncheck “Use dist/ if present” to deploy current project files, or</li>
-            <li>Generate a CI workflow below to build and publish dist/ automatically.</li>
-          </ul>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              No dist/ files detected. You can:
+              <ul className="list-disc list-inside">
+                <li>Uncheck “Use dist/ if present” to deploy current project files, or</li>
+                <li>Generate a CI workflow below to build and publish dist/ automatically.</li>
+              </ul>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setHideDistBanner(true);
+                saveEncrypted(nsKey(pid, "sec_hide_dist_banner"), "1");
+              }}
+              aria-label="Don't show again"
+              title="Don't show again for this project"
+            >
+              Don’t show again
+            </Button>
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
