@@ -32,6 +32,7 @@ function EditorPanel() {
   const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
   const debouncedCode = useDebounced(code, 150);
   const lang = languageFromPath(currentFilePath);
+  const [formatOnSave, setFormatOnSave] = React.useState<boolean>(() => localStorage.getItem("bf_format_on_save") === "1");
 
   React.useEffect(() => {
     setCode(file?.contents ?? "");
@@ -42,7 +43,14 @@ function EditorPanel() {
     if (currentFilePath) stageDiff(currentFilePath, debouncedCode);
   };
   const onSave = async () => {
-    if (currentFilePath) await upsertFile(currentFilePath, debouncedCode);
+    if (!currentFilePath) return;
+    let output = debouncedCode;
+    if (formatOnSave) {
+      const { formatContent } = await import("./lib/editor/format");
+      output = formatContent(lang, output);
+      setCode(output);
+    }
+    await upsertFile(currentFilePath, output);
   };
 
   // Keyboard shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Enter stage, Shift+Cmd/Ctrl+Enter approve, Escape reject
@@ -69,13 +77,26 @@ function EditorPanel() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath]);
+  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath, formatOnSave, lang]);
+
+  React.useEffect(() => {
+    localStorage.setItem("bf_format_on_save", formatOnSave ? "1" : "0");
+  }, [formatOnSave]);
 
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
         <CardTitle>Editor (Monaco){currentFilePath ? ` — ${currentFilePath}` : ""}</CardTitle>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
+          <label className="text-xs flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={formatOnSave}
+              onChange={(e) => setFormatOnSave(e.currentTarget.checked)}
+              aria-label="Format on save"
+            />
+            Format on save
+          </label>
           <Button onClick={onSave} disabled={!currentFilePath}>Save</Button>
           <Button variant="secondary" onClick={onStage} disabled={!canStage}>Propose Change</Button>
           {staged && (
