@@ -194,7 +194,106 @@ const mdStatic: Template = {
   ],
 };
 
-const templates: Template[] = [vanillaHtml, spaRouter, tailwindCdn, mdStatic];
+const tailwindDark: Template = {
+  id: "tailwind-dark-toggle",
+  name: "Tailwind Dark Theme Toggle",
+  description: "Tailwind CDN with dark mode toggle stored in localStorage.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Tailwind Dark Mode</title>
+    <script>
+      // persist dark mode
+      try {
+        const saved = localStorage.getItem("theme");
+        if (saved === "dark") document.documentElement.classList.add("dark");
+      } catch {}
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = { darkMode: 'class' }
+    </script>
+  </head>
+  <body class="p-6 font-sans bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <h1 class="text-2xl font-bold mb-2">Dark Mode</h1>
+    <p class="mb-4 text-slate-600 dark:text-slate-300">Toggle theme with the button below.</p>
+    <button id="toggle" class="px-3 py-2 rounded bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900">Toggle Dark</button>
+    <script>
+      document.getElementById("toggle").addEventListener("click", () => {
+        const el = document.documentElement;
+        const isDark = el.classList.toggle("dark");
+        try { localStorage.setItem("theme", isDark ? "dark" : "light"); } catch {}
+      });
+    </script>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const blogStatic: Template = {
+  id: "markdown-blog",
+  name: "Static Blog (Markdown index)",
+  description: "Index page lists posts/*.md and renders content client-side.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Static Blog</title>
+    <style>
+      body{font-family:system-ui,sans-serif;padding:1rem;max-width:820px;margin:auto}
+      .post{margin-bottom:1rem}
+      .muted{color:#64748b}
+      pre{background:#f6f8fa;padding:.75rem;border-radius:.375rem;overflow:auto}
+    </style>
+  </head>
+  <body>
+    <h1>My Blog</h1>
+    <div id="list"></div>
+    <hr/>
+    <main id="app"></main>
+    <script>
+      const posts = ["posts/first.md","posts/second.md"];
+      const list = document.getElementById("list");
+      list.innerHTML = posts.map(p => '<div class="post"><a href="#/'+p+'">'+p.replace('posts/','')+'</a></div>').join('');
+      async function load(path){
+        if (!path){ document.getElementById("app").innerHTML = '<p class="muted">Select a post</p>'; return; }
+        const res = await fetch(path);
+        const text = await res.text();
+        document.getElementById("app").innerHTML = mdToHtml(text);
+      }
+      function mdToHtml(md){
+        const fence = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
+        md = md.replace(fence, (_, lang, code) => '<pre><code>' + escapeHtml(code) + '</code></pre>');
+        md = md.replace(/^###\\s+(.*)$/gm, '<h3>$1</h3>');
+        md = md.replace(/^##\\s+(.*)$/gm, '<h2>$1</h2>');
+        md = md.replace(/^#\\s+(.*)$/gm, '<h1>$1</h1>');
+        md = md.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+        md = md.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
+        md = md.split(/\\n\\n+/).map(b => /<h\\d|<pre|<ul|<ol/.test(b) ? b : '<p>'+b+'</p>').join('\\n');
+        return md;
+      }
+      function escapeHtml(s){return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+      function route(){ const hash = location.hash.slice(2); load(hash); }
+      window.addEventListener("hashchange", route);
+      route();
+    </script>
+  </body>
+</html>`,
+    },
+    { path: "posts/first.md", contents: "# First Post\\n\\nHello from the first post." },
+    { path: "posts/second.md", contents: "# Second Post\\n\\nAnother post content." },
+  ],
+};
+
+const templates: Template[] = [vanillaHtml, spaRouter, tailwindCdn, mdStatic, tailwindDark, blogStatic];
 
 export function TemplatesGallery() {
   const { createProject, upsertFile } = useProjectStore();

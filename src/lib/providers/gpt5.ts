@@ -14,10 +14,10 @@ export const GPT5Adapter: ProviderAdapter = {
     return { tools: true, vision: true } satisfies CapabilitySet;
   },
   async validate() {
-    // Always \"valid\" as placeholder so it can be selected in UI without creds
+    // Always "valid" as placeholder so it can be selected in UI without creds
     return { ok: true, message: "Placeholder provider" };
   },
-  async *stream(_def, _creds, payload: ProviderPayload): AsyncIterable<DeltaChunk> {
+  async *stream(_def, _creds, payload: ProviderPayload, _opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
     yield { type: "event", data: "info: GPT‑5 placeholder adapter — no real API calls are performed." };
     yield { type: "text", data: `model=${payload.model} ` };
     yield { type: "text", data: `messages=${payload.messages.length}` };

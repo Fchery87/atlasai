@@ -29,7 +29,7 @@ export const OpenRouterAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, creds, payload: ProviderPayload): AsyncIterable<DeltaChunk> {
+  async *stream(def, creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
     const res = await fetch(`${def.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -43,6 +43,7 @@ export const OpenRouterAdapter: ProviderAdapter = {
         temperature: payload.temperature,
         max_tokens: payload.max_tokens,
       }),
+      signal: opts?.signal,
     });
     if (!res.ok || !res.body) {
       yield { type: "event", data: `error: HTTP ${res.status}` };

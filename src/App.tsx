@@ -338,13 +338,16 @@ function ChatPanel() {
       }
       key = k.plaintext;
     }
+    const ac = new AbortController();
+    stopRef.current = false;
     try {
       const payload = {
         model: model || (bundle.def.models[0]?.id ?? ""),
         messages: buildMessages(),
       };
-      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload)) {
+      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload, { signal: ac.signal })) {
         if (stopRef.current) {
+          ac.abort();
           setStatus("Stopped");
           break;
         }
@@ -356,7 +359,11 @@ function ChatPanel() {
       }
       if (!stopRef.current) setStatus("Done");
     } catch (e: any) {
-      setStatus(e?.message ?? "Stream failed");
+      if (e?.name === "AbortError") {
+        setStatus("Stopped");
+      } else {
+        setStatus(e?.message ?? "Stream failed");
+      }
     } finally {
       setStreaming(false);
     }

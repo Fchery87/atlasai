@@ -43,7 +43,7 @@ export const AnthropicAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, creds, payload: ProviderPayload): AsyncIterable<DeltaChunk> {
+  async *stream(def, creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
     const { system, messages } = toAnthropicMessages(payload);
     const res = await fetch(`${def.baseUrl}/messages`, {
       method: "POST",
@@ -59,6 +59,7 @@ export const AnthropicAdapter: ProviderAdapter = {
         max_tokens: payload.max_tokens,
         temperature: payload.temperature,
       }),
+      signal: opts?.signal,
     });
     if (!res.ok || !res.body) {
       yield { type: "event", data: `error: HTTP ${res.status}` };
