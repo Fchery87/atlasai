@@ -55,7 +55,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       label: "New Folder",
       run: async () => {
         const path = prompt("New folder path");
-        if (path) await createFile(path.replace(/\\/?$/, "/") + "untitled.txt");
+        if (path) await createFile(path.replace(/\/?$/, "/") + "untitled.txt");
       },
     },
     {

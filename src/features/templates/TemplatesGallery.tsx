@@ -166,7 +166,7 @@ const mdStatic: Template = {
       }
       function mdToHtml(md){
         // extremely small markdown renderer (headings, paragraphs, code fences)
-        const fence = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
+        const fence = /\`{3}([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)\`{3}/g;
         md = md.replace(fence, (_, lang, code) => '<pre><code>' + escapeHtml(code) + '</code></pre>');
         md = md.replace(/^###\\s+(.*)$/gm, '<h3>$1</h3>');
         md = md.replace(/^##\\s+(.*)$/gm, '<h2>$1</h2>');
@@ -270,7 +270,7 @@ const blogStatic: Template = {
         document.getElementById("app").innerHTML = mdToHtml(text);
       }
       function mdToHtml(md){
-        const fence = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
+        const fence = /\`{3}([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)\`{3}/g;
         md = md.replace(fence, (_, lang, code) => '<pre><code>' + escapeHtml(code) + '</code></pre>');
         md = md.replace(/^###\\s+(.*)$/gm, '<h3>$1</h3>');
         md = md.replace(/^##\\s+(.*)$/gm, '<h2>$1</h2>');
