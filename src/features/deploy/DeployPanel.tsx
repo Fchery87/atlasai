@@ -30,6 +30,7 @@ export function DeployPanel() {
   const [useDist, setUseDist] = React.useState<boolean>(true);
   const [ciBranch, setCiBranch] = React.useState<string>("main");
   const [userRepoBranch, setUserRepoBranch] = React.useState<string>("main");
+  const [defaultBranch, setDefaultBranch] = React.useState<string>("main");
 
   // Load persisted tokens/config per-project with global fallback
   React.useEffect(() => {
@@ -49,6 +50,10 @@ export function DeployPanel() {
         const v = (await loadDecrypted(projKey)) ?? (await loadDecrypted(globalKey));
         if (v) setter(v);
       }
+      const def = (await loadDecrypted(nsKey(pid, "sec_default_branch"))) ?? "main";
+      setDefaultBranch(def);
+      setCiBranch(def);
+      setUserRepoBranch(def);
     })();
   }, [pid]);
 
@@ -61,6 +66,7 @@ export function DeployPanel() {
   React.useEffect(() => { if (vercelBuildCmd) saveEncrypted(nsKey(pid, "sec_vercel_build_cmd"), vercelBuildCmd); }, [vercelBuildCmd, pid]);
   React.useEffect(() => { if (vercelOutDir) saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir); }, [vercelOutDir, pid]);
   React.useEffect(() => { if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo); }, [ghRepo, pid]);
+  React.useEffect(() => { if (defaultBranch) saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch); }, [defaultBranch, pid]);
 
   const filesForDeploy = React.useCallback(() => {
     if (!current) return [];
@@ -252,6 +258,20 @@ export function DeployPanel() {
           <input type="checkbox" checked={useDist} onChange={(e) => setUseDist(e.currentTarget.checked)} aria-label="Use dist/ folder if present" />
           Use dist/ if present
         </label>
+        <label className="text-xs flex items-center gap-1" title="Default branch used for generated workflows">
+          <span>Default branch</span>
+          <input
+            className="h-7 rounded-md border border-input px-2 text-xs"
+            value={defaultBranch}
+            onChange={(e) => {
+              const v = e.currentTarget.value || "main";
+              setDefaultBranch(v);
+              setCiBranch(v);
+              setUserRepoBranch(v);
+            }}
+            aria-label="Default branch"
+          />
+        </label>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div className="space-y-2">
@@ -264,7 +284,7 @@ export function DeployPanel() {
             onChange={(e) => setGhRepo(e.currentTarget.value)}
           />
           <div className="flex gap-2 items-center">
-            <Button variant="secondary" onClick={deployGitHubPages} aria-label="Deploy to GitHub Pages">
+            <Button variant="secondary" onClick={deployGitHubPages} aria-label="Deploy to GitHub Pages" title="Uploads current files (or dist/) to gh-pages branch">
               Deploy
             </Button>
             <input
@@ -273,6 +293,7 @@ export function DeployPanel() {
               aria-label="GH Pages CI branch"
               value={ciBranch}
               onChange={(e) => setCiBranch(e.currentTarget.value)}
+              title="Workflow will run on pushes to this branch"
             />
             <Button
               variant="ghost"
@@ -322,7 +343,7 @@ jobs:
                 URL.revokeObjectURL(url);
               }}
               aria-label="Download GitHub Pages workflow"
-              title="Download GitHub Pages workflow"
+              title="Download GitHub Pages workflow (add to .github/workflows)"
             >
               Download GH Pages Workflow
             </Button>
@@ -344,7 +365,7 @@ jobs:
             value={netlifySiteId}
             onChange={(e) => setNetlifySiteId(e.currentTarget.value)}
           />
-          <Button variant="secondary" onClick={deployNetlify} aria-label="Deploy to Netlify">
+          <Button variant="secondary" onClick={deployNetlify} aria-label="Deploy to Netlify" title="Creates a hash-based deploy and uploads only required files">
             Deploy
           </Button>
         </div>
@@ -387,7 +408,7 @@ jobs:
               onChange={(e) => setVercelOutDir(e.currentTarget.value)}
             />
           </div>
-          <Button variant="secondary" onClick={deployVercel} aria-label="Deploy to Vercel">
+          <Button variant="secondary" onClick={deployVercel} aria-label="Deploy to Vercel" title="Links project/config then requests a deployment">
             Deploy
           </Button>
         </div>
@@ -410,6 +431,7 @@ jobs:
               aria-label="User repo branch"
               value={userRepoBranch}
               onChange={(e) => setUserRepoBranch(e.currentTarget.value)}
+              title="Workflow will run on pushes to this branch"
             />
             <Button
               variant="ghost"
@@ -444,7 +466,7 @@ jobs:
                 URL.revokeObjectURL(url);
               }}
               aria-label="Download user GH Pages workflow"
-              title="Download user GH Pages workflow"
+              title="Download user GH Pages workflow (add to .github/workflows)"
             >
               Download User GH Pages Workflow
             </Button>
@@ -453,13 +475,14 @@ jobs:
         <div className="mt-4 space-y-2">
           <div className="font-medium">Stored Credentials (encrypted)</div>
           <ul className="text-xs space-y-1">
-            <li>Netlify token: {netlifyToken ? "stored" : "not set"}</li>
-            <li>Netlify site id: {netlifySiteId ? "stored" : "not set"}</li>
-            <li>Vercel token: {vercelToken ? "stored" : "not set"}</li>
-            <li>Vercel project: {vercelProject ? "stored" : "not set"}</li>
-            <li>GH Pages repo: {ghRepo ? "stored" : "not set"}</li>
+            <li title="Saved for this project only">Netlify token: {netlifyToken ? "stored" : "not set"}</li>
+            <li title="Saved for this project only">Netlify site id: {netlifySiteId ? "stored" : "not set"}</li>
+            <li title="Saved for this project only">Vercel token: {vercelToken ? "stored" : "not set"}</li>
+            <li title="Saved for this project only">Vercel project: {vercelProject ? "stored" : "not set"}</li>
+            <li title="Saved for this project only">GH Pages repo: {ghRepo ? "stored" : "not set"}</li>
+            <li title="Saved for this project only">Default branch: {defaultBranch || "main"}</li>
           </ul>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="destructive"
               onClick={() => {
@@ -472,6 +495,7 @@ jobs:
                   nsKey(pid, "sec_vercel_build_cmd"),
                   nsKey(pid, "sec_vercel_out_dir"),
                   nsKey(pid, "sec_github_pages_repo"),
+                  nsKey(pid, "sec_default_branch"),
                 ];
                 keys.forEach((k) => localStorage.removeItem(k));
                 setNetlifyToken("");
@@ -482,68 +506,49 @@ jobs:
                 setVercelBuildCmd("npm run build");
                 setVercelOutDir("dist");
                 setGhRepo("");
+                setDefaultBranch("main");
+                setCiBranch("main");
+                setUserRepoBranch("main");
                 setStatus("Cleared stored credentials for this project");
               }}
               aria-label="Clear stored credentials"
-              title="Clear stored credentials"
+              title="Clear stored credentials for this project"
             >
               Clear Stored Credentials (Project)
             </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                // Clear all deploy-related secrets across all projects
+                const toRemove: string[] = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                  const k = localStorage.key(i) || "";
+                  if (
+                    k.startsWith("sec_netlify_") ||
+                    k.startsWith("sec_vercel_") ||
+                    k.startsWith("sec_github_pages_repo") ||
+                    k.startsWith("sec_default_branch")
+                  ) {
+                    toRemove.push(k);
+                  }
+                }
+                toRemove.forEach((k) => localStorage.removeItem(k));
+                setStatus("Cleared all stored deploy credentials");
+              }}
+              aria-label="Clear all stored deploy credentials"
+              title="Clear all stored deploy credentials across all projects"
+            >
+              Clear All Stored Credentials
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2" title="How to use the workflows">
+            Tip: Add the downloaded YAML file to your repo under .github/workflows/, commit, and push. GitHub will run the workflow on pushes to the specified branch. Ensure your project builds to dist/ (or adjust publish_dir/output). For GitHub Pages, enable Pages in repo settings if needed.
           </div>
         </div>
       </div>
     </div>
   );
-} aria-label="Deploy to Vercel">
-            Deploy
-          </Button>
-        </div>
-      </div>
-      <div className="rounded-md border p-2">
-        <div className="font-medium">Status</div>
-        <div aria-live="polite">{status}</div>
-        {target && <div className="text-xs text-muted-foreground mt-1">Target: {target}</div>}
-        <div className="mt-2 text-xs max-h-40 overflow-auto">
-          {logs.map((l, i) => (
-            <div key={i}>{l}</div>
-          ))}
-        </div>
-        <div className="mt-3">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              const content = `name: Build and Deploy to GitHub Pages
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+}}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
