@@ -27,23 +27,23 @@ type State = {
 
 type Actions = {
   loadProjects: () => Promise<void>;
-  createProject: (name: string) => Promise<void>;
-  openProject: (id: string) => Promise<void>;
-  renameProject: (id: string, name: string) => Promise<void>;
-  selectFile: (path?: string) => void;
-  createFile: (path: string) => Promise<void>;
-  renameFile: (oldPath: string, newPath: string) => Promise<void>;
-  upsertFile: (path: string, contents: string) => Promise<void>;
-  deleteFile: (path: string) => Promise<void>;
-  snapshot: (label: string) => Promise<Snapshot>;
-  restoreSnapshot: (id: string) => Promise<void>;
-  stageDiff: (path: string, after?: string) => void;
+  createProject: (_name: string) => Promise<void>;
+  openProject: (_id: string) => Promise<void>;
+  renameProject: (_id: string, _name: string) => Promise<void>;
+  selectFile: (_path?: string) => void;
+  createFile: (_path: string) => Promise<void>;
+  renameFile: (_oldPath: string, _newPath: string) => Promise<void>;
+  upsertFile: (_path: string, _contents: string) => Promise<void>;
+  deleteFile: (_path: string) => Promise<void>;
+  snapshot: (_label: string) => Promise<Snapshot>;
+  restoreSnapshot: (_id: string) => Promise<void>;
+  stageDiff: (_path: string, _after?: string) => void;
   approveDiff: () => Promise<void>;
   undoLastApply: () => Promise<void>;
   redoLastApply: () => Promise<void>;
   rejectDiff: () => void;
   exportZip: () => Promise<Blob>;
-  importZip: (file: File) => Promise<Project>;
+  importZip: (_file: File) => Promise<Project>;
   rebuildPreview: () => void;
 };
 

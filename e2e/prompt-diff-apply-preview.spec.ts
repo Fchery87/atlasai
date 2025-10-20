@@ -7,10 +7,11 @@ test("Prompt → Diff → Apply → Preview end-to-end (mocked adapter streams)"
 
   // Create project
   await page.getByLabel("Project name").fill("e2e-project");
-  await page.getByRole("button", { name: "Create" }).click();
+  // Use first() to get the first Create button in the Projects section
+  await page.getByRole("button", { name: "Create" }).first().click();
 
   // Create index.html
-  await page.getByRole("button", { name: "New" }).click();
+  await page.getByRole("button", { name: "Create file" }).click();
   const newInput = page.getByLabel("New file path");
   await newInput.fill("index.html");
   await newInput.press("Enter");
@@ -20,12 +21,15 @@ test("Prompt → Diff → Apply → Preview end-to-end (mocked adapter streams)"
   await page.keyboard.type(
     "<!doctype html><html><body><div id='root'>Hello</div></body></html>",
   );
-  // Save
-  await page.getByRole("button", { name: "Save" }).click();
+  // Save - use the Save button in the Editor panel with the specific title
+  await page.getByTitle("Save (Ctrl/Cmd+S)").click();
 
   // Open Chat, select provider (GPT‑5 placeholder to avoid API calls)
-  await page.getByLabel("Provider").selectOption("gpt5");
-  await page.getByLabel("Model").selectOption("gpt-5-code-preview");
+  // Use exact match to get the select elements in the Chat panel
+  await page.getByLabel("Provider", { exact: true }).selectOption("gpt5");
+  await page
+    .getByLabel("Model", { exact: true })
+    .selectOption("gpt-5-code-preview");
 
   // Fill prompt - this will trigger the GPT-5 placeholder to stream the expected response
   await page
