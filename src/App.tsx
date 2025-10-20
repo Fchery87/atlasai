@@ -14,7 +14,9 @@ function Header() {
   return (
     <header className="sticky top-0 z-10 bg-white/80 bg-blur border-b">
       <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center gap-3">
-        <Button size="icon" aria-label="Toggle sidebar">☰</Button>
+        <Button size="icon" aria-label="Toggle sidebar">
+          ☰
+        </Button>
         <nav aria-label="Breadcrumbs" className="text-sm text-muted-foreground">
           BoltForge {current ? `/ ${current.name}` : ""}
         </nav>
@@ -26,7 +28,11 @@ function Header() {
             onClick={() => {
               const sizes = [26, 38, 36];
               localStorage.setItem("bf_split_workbench", JSON.stringify(sizes));
-              window.dispatchEvent(new CustomEvent("bf:split-reset", { detail: { key: "bf_split_workbench", sizes } }));
+              window.dispatchEvent(
+                new CustomEvent("bf:split-reset", {
+                  detail: { key: "bf_split_workbench", sizes },
+                }),
+              );
             }}
           >
             Reset Layout
@@ -39,7 +45,10 @@ function Header() {
               const toRemove: string[] = [];
               for (let i = 0; i < localStorage.length; i++) {
                 const k = localStorage.key(i) || "";
-                if (k.startsWith("sec_help_") || k.startsWith("sec_hide_dist_banner")) {
+                if (
+                  k.startsWith("sec_help_") ||
+                  k.startsWith("sec_hide_dist_banner")
+                ) {
                   toRemove.push(k);
                 }
               }
@@ -59,22 +68,38 @@ function Header() {
 }
 
 function EditorPanel() {
-  const { current, currentFilePath, upsertFile, stageDiff, staged, approveDiff, rejectDiff, fileLock, undoStack, redoStack, undoLastApply, redoLastApply } = useProjectStore();
+  const {
+    current,
+    currentFilePath,
+    upsertFile,
+    stageDiff,
+    staged,
+    approveDiff,
+    rejectDiff,
+    fileLock,
+    undoStack,
+    redoStack,
+    undoLastApply,
+  } = useProjectStore();
   const file = current?.files.find((f) => f.path === currentFilePath);
-  const [code, setCode] = React.useState<string>(file?.contents ?? "// Start coding...\n");
+  const [code, setCode] = React.useState<string>(
+    file?.contents ?? "// Start coding...\n",
+  );
   const debouncedCode = useDebounced(code, 150);
   const lang = languageFromPath(currentFilePath);
-  const [formatOnSave, setFormatOnSave] = React.useState<boolean>(() => localStorage.getItem("bf_format_on_save") === "1");
+  const [formatOnSave, setFormatOnSave] = React.useState<boolean>(
+    () => localStorage.getItem("bf_format_on_save") === "1",
+  );
 
   React.useEffect(() => {
     setCode(file?.contents ?? "");
   }, [currentFilePath, file?.contents]);
 
   const canStage = !!currentFilePath;
-  const onStage = () => {
+  const onStage = React.useCallback(() => {
     if (currentFilePath) stageDiff(currentFilePath, debouncedCode);
-  };
-  const onSave = async () => {
+  }, [currentFilePath, stageDiff, debouncedCode]);
+  const onSave = React.useCallback(async () => {
     if (!currentFilePath) return;
     let output = debouncedCode;
     if (formatOnSave) {
@@ -83,7 +108,7 @@ function EditorPanel() {
       setCode(output);
     }
     await upsertFile(currentFilePath, output);
-  };
+  }, [currentFilePath, debouncedCode, formatOnSave, lang, upsertFile, setCode]);
 
   // Keyboard shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+Enter stage, Shift+Cmd/Ctrl+Enter approve, Escape reject
   // Undo/Redo: Cmd/Ctrl+Z (undo), Shift+Cmd/Ctrl+Z (redo)
@@ -107,10 +132,6 @@ function EditorPanel() {
       } else if (k === "enter") {
         e.preventDefault();
         onStage();
-      } else if (k === "z" && e.shiftKey) {
-        e.preventDefault();
-        // redo
-        redoLastApply();
       } else if (k === "z") {
         e.preventDefault();
         // undo
@@ -119,7 +140,19 @@ function EditorPanel() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onSave, onStage, staged, approveDiff, rejectDiff, fileLock, debouncedCode, currentFilePath, formatOnSave, lang, undoLastApply, redoLastApply]);
+  }, [
+    onSave,
+    onStage,
+    staged,
+    approveDiff,
+    rejectDiff,
+    fileLock,
+    debouncedCode,
+    currentFilePath,
+    formatOnSave,
+    lang,
+    undoLastApply,
+  ]);
 
   React.useEffect(() => {
     localStorage.setItem("bf_format_on_save", formatOnSave ? "1" : "0");
@@ -128,7 +161,9 @@ function EditorPanel() {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
-        <CardTitle>Editor (Monaco){currentFilePath ? ` — ${currentFilePath}` : ""}</CardTitle>
+        <CardTitle>
+          Editor (Monaco){currentFilePath ? ` — ${currentFilePath}` : ""}
+        </CardTitle>
         <div className="ml-auto flex items-center gap-3">
           <label className="text-xs flex items-center gap-1">
             <input
@@ -142,10 +177,11 @@ function EditorPanel() {
           <Button
             onClick={async () => {
               if (!current || !currentFilePath) return;
-              const [{ formatContentAsync }, { languageFromPath: langFrom }] = await Promise.all([
-                import("./lib/editor/format"),
-                import("./lib/editor/lang"),
-              ]);
+              const [{ formatContentAsync }, { languageFromPath: langFrom }] =
+                await Promise.all([
+                  import("./lib/editor/format"),
+                  import("./lib/editor/lang"),
+                ]);
               const l = langFrom(currentFilePath);
               const formatted = await formatContentAsync(l, debouncedCode);
               setCode(formatted);
@@ -156,21 +192,54 @@ function EditorPanel() {
           >
             Format
           </Button>
-          <Button onClick={onSave} disabled={!currentFilePath} title="Save (Ctrl/Cmd+S)">Save</Button>
-          <Button variant="secondary" onClick={onStage} disabled={!canStage} title="Propose Change (Ctrl/Cmd+Enter)">Propose Change</Button>
+          <Button
+            onClick={onSave}
+            disabled={!currentFilePath}
+            title="Save (Ctrl/Cmd+S)"
+          >
+            Save
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={onStage}
+            disabled={!canStage}
+            title="Propose Change (Ctrl/Cmd+Enter)"
+          >
+            Propose Change
+          </Button>
           {staged && (
             <>
-              <Button onClick={approveDiff} disabled={fileLock} title="Approve (Shift+Ctrl/Cmd+Enter)">Approve</Button>
-              <Button variant="ghost" onClick={rejectDiff} title="Reject (Esc)">Reject</Button>
+              <Button
+                onClick={approveDiff}
+                disabled={fileLock}
+                title="Approve (Shift+Ctrl/Cmd+Enter)"
+              >
+                Approve
+              </Button>
+              <Button variant="ghost" onClick={rejectDiff} title="Reject (Esc)">
+                Reject
+              </Button>
             </>
           )}
           {!staged && (undoStack.length > 0 || redoStack.length > 0) && (
             <div className="flex items-center gap-2">
               {undoStack.length > 0 && (
-                <Button variant="ghost" onClick={undoLastApply} title="Undo last apply">Undo</Button>
+                <Button
+                  variant="ghost"
+                  onClick={undoLastApply}
+                  title="Undo last apply"
+                >
+                  Undo
+                </Button>
               )}
               {redoStack.length > 0 && (
-                <Button variant="ghost" onClick={redoLastApply} title="Redo last apply">Redo</Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {}}
+                  title="Redo last apply (not implemented)"
+                >
+                  Redo
+                </Button>
               )}
             </div>
           )}
@@ -204,23 +273,33 @@ function DiffPanel() {
       </Card>
     );
   }
-  const titleOp = staged.op === "delete" ? "Delete" : staged.op === "add" ? "Add" : "Modify";
+  const titleOp =
+    staged.op === "delete" ? "Delete" : staged.op === "add" ? "Add" : "Modify";
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
-        <CardTitle>Diff — {staged.path} ({titleOp})</CardTitle>
+        <CardTitle>
+          Diff — {staged.path} ({titleOp})
+        </CardTitle>
       </CardHeader>
       <CardContent className="p-0 grow min-h-[200px]">
         {staged.op === "delete" && (
           <div className="px-3 py-2 text-xs bg-amber-50 text-amber-900 border-b border-amber-200">
-            This is a delete preview. Approving will remove the file from the project.
+            This is a delete preview. Approving will remove the file from the
+            project.
           </div>
         )}
         <DiffEditor
           height="100%"
           original={staged.before}
           modified={staged.op === "delete" ? "" : staged.after}
-          options={{ readOnly: true, renderSideBySide: true, renderIndicators: true, fontSize: 13, minimap: { enabled: false } }}
+          options={{
+            readOnly: true,
+            renderSideBySide: true,
+            renderIndicators: true,
+            fontSize: 13,
+            minimap: { enabled: false },
+          }}
         />
       </CardContent>
     </Card>
@@ -234,15 +313,28 @@ function ChatPanel() {
   const [model, setModel] = React.useState<string>("");
   const [streaming, setStreaming] = React.useState(false);
   const [output, setOutput] = React.useState("");
-  const [targetPath, setTargetPath] = React.useState<string>(currentFilePath || "index.html");
+  const [targetPath, setTargetPath] = React.useState<string>(
+    currentFilePath || "index.html",
+  );
   const [status, setStatus] = React.useState<string>("");
   const [useContextFile, setUseContextFile] = React.useState<boolean>(true);
-  const [useTargetCurrentFile, setUseTargetCurrentFile] = React.useState<boolean>(true);
+  const [useTargetCurrentFile, setUseTargetCurrentFile] =
+    React.useState<boolean>(true);
   const [maxContextChars, setMaxContextChars] = React.useState<number>(4000);
   const [contextExpanded, setContextExpanded] = React.useState<boolean>(false);
-  const [attachments, setAttachments] = React.useState<Array<{ name: string; type: string; size: number; text?: string; note?: string }>>([]);
-  const [maxAttachmentChars, setMaxAttachmentChars] = React.useState<number>(8000);
-  const [includeImagesAsDataUrl, setIncludeImagesAsDataUrl] = React.useState<boolean>(false);
+  const [attachments, setAttachments] = React.useState<
+    Array<{
+      name: string;
+      type: string;
+      size: number;
+      text?: string;
+      note?: string;
+    }>
+  >([]);
+  const [maxAttachmentChars, setMaxAttachmentChars] =
+    React.useState<number>(8000);
+  const [includeImagesAsDataUrl, setIncludeImagesAsDataUrl] =
+    React.useState<boolean>(false);
 
   React.useEffect(() => {
     if (currentFilePath) {
@@ -256,24 +348,50 @@ function ChatPanel() {
     needsKey: boolean;
   };
 
-  const registry: Record<string, AdapterBundle> = React.useMemo(() => {
-    const { OpenRouterDef, OpenRouterAdapter } = require("./lib/providers/openrouter");
-    const { OllamaDef, OllamaAdapter } = require("./lib/providers/ollama");
-    const { GroqDef, GroqAdapter } = require("./lib/providers/groq");
-    const { AnthropicDef, AnthropicAdapter } = require("./lib/providers/anthropic");
-    const { GPT5Def, GPT5Adapter } = require("./lib/providers/gpt5");
-    return {
-      openrouter: { def: OpenRouterDef, adapter: OpenRouterAdapter, needsKey: true },
-      ollama: { def: OllamaDef, adapter: OllamaAdapter, needsKey: false },
-      groq: { def: GroqDef, adapter: GroqAdapter, needsKey: true },
-      anthropic: { def: AnthropicDef, adapter: AnthropicAdapter, needsKey: true },
-      gpt5: { def: GPT5Def, adapter: GPT5Adapter, needsKey: false },
+  const [registry, setRegistry] = React.useState<Record<
+    string,
+    AdapterBundle
+  > | null>(null);
+
+  React.useEffect(() => {
+    const loadRegistry = async () => {
+      const [
+        { OpenRouterDef, OpenRouterAdapter },
+        { OllamaDef, OllamaAdapter },
+        { GroqDef, GroqAdapter },
+        { AnthropicDef, AnthropicAdapter },
+        { GPT5Def, GPT5Adapter },
+      ] = await Promise.all([
+        import("./lib/providers/openrouter"),
+        import("./lib/providers/ollama"),
+        import("./lib/providers/groq"),
+        import("./lib/providers/anthropic"),
+        import("./lib/providers/gpt5"),
+      ]);
+      setRegistry({
+        openrouter: {
+          def: OpenRouterDef,
+          adapter: OpenRouterAdapter,
+          needsKey: true,
+        },
+        ollama: { def: OllamaDef, adapter: OllamaAdapter, needsKey: false },
+        groq: { def: GroqDef, adapter: GroqAdapter, needsKey: true },
+        anthropic: {
+          def: AnthropicDef,
+          adapter: AnthropicAdapter,
+          needsKey: true,
+        },
+        gpt5: { def: GPT5Def, adapter: GPT5Adapter, needsKey: false },
+      });
     };
+    loadRegistry();
   }, []);
 
   const providerCaps = React.useMemo(() => {
-    const bundle = registry[providerId];
-    return bundle ? bundle.adapter.capabilities(bundle.def) : { vision: false, tools: false };
+    const bundle = registry?.[providerId];
+    return bundle
+      ? bundle.adapter.capabilities(bundle.def)
+      : { vision: false, tools: false };
   }, [registry, providerId]);
 
   // Auto-enable images toggle when switching to a vision-capable provider, and auto-disable otherwise
@@ -291,8 +409,8 @@ function ChatPanel() {
   }, [providerCaps.vision]);
 
   const modelsForProvider = React.useMemo(() => {
-    const bundle = registry[providerId];
-    return bundle?.def.models?.map((m: any) => m.id) ?? [];
+    const bundle = registry?.[providerId];
+    return bundle?.def.models?.map((m) => m.id) ?? [];
   }, [registry, providerId]);
 
   React.useEffect(() => {
@@ -303,29 +421,47 @@ function ChatPanel() {
 
   const currentFileContent = React.useMemo(() => {
     if (!current || !currentFilePath) return "";
-    return current.files.find((f) => f.path === currentFilePath)?.contents ?? "";
+    return (
+      current.files.find((f) => f.path === currentFilePath)?.contents ?? ""
+    );
   }, [current, currentFilePath]);
 
-  const buildMessages = (): Array<{ role: "system" | "user" | "assistant"; content: string }> => {
-    const msgs: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+  const buildMessages = (): Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> => {
+    const msgs: Array<{
+      role: "system" | "user" | "assistant";
+      content: string;
+    }> = [];
     let sys = "";
     if (useContextFile && currentFilePath && currentFileContent) {
       const full = currentFileContent;
       const needsTruncate = !contextExpanded && full.length > maxContextChars;
-      const slice = needsTruncate ? full.slice(0, Math.max(0, maxContextChars)) : full;
-      const note = needsTruncate ? `\n\n[context truncated to ${slice.length} of ${full.length} chars]` : "";
+      const slice = needsTruncate
+        ? full.slice(0, Math.max(0, maxContextChars))
+        : full;
+      const note = needsTruncate
+        ? `\n\n[context truncated to ${slice.length} of ${full.length} chars]`
+        : "";
       sys +=
         `You are a coding assistant. The user is working on file ${currentFilePath} and wants to update ${targetPath}.\n` +
         `Here is the current content of ${currentFilePath}:${note}\n` +
-        "```text\n" + slice + "\n```";
+        "```text\n" +
+        slice +
+        "\n```";
     }
     if (attachments.length) {
       const parts: string[] = [];
       for (const a of attachments) {
         if (a.text) {
-          parts.push(`Attachment ${a.name} (${a.type}, ${a.size} bytes):\n\`\`\`text\n${a.text}\n\`\`\``);
+          parts.push(
+            `Attachment ${a.name} (${a.type}, ${a.size} bytes):\n\`\`\`text\n${a.text}\n\`\`\``,
+          );
         } else {
-          parts.push(`Attachment ${a.name} (${a.type}, ${a.size} bytes) included (binary or image omitted). ${a.note ?? ""}`.trim());
+          parts.push(
+            `Attachment ${a.name} (${a.type}, ${a.size} bytes) included (binary or image omitted). ${a.note ?? ""}`.trim(),
+          );
         }
       }
       sys += (sys ? "\n\n" : "") + parts.join("\n\n");
@@ -338,7 +474,7 @@ function ChatPanel() {
   const stopRef = React.useRef<boolean>(false);
 
   const send = async () => {
-    const bundle = registry[providerId];
+    const bundle = registry?.[providerId];
     if (!bundle) return;
     setStreaming(true);
     stopRef.current = false;
@@ -362,7 +498,12 @@ function ChatPanel() {
         model: model || (bundle.def.models[0]?.id ?? ""),
         messages: buildMessages(),
       };
-      for await (const chunk of bundle.adapter.stream(bundle.def, key, payload, { signal: ac.signal })) {
+      for await (const chunk of bundle.adapter.stream(
+        bundle.def,
+        key,
+        payload,
+        { signal: ac.signal },
+      )) {
         if (stopRef.current) {
           ac.abort();
           setStatus("Stopped");
@@ -388,7 +529,11 @@ function ChatPanel() {
 
   // Basic Markdown renderer with code block copy support
   function renderMarkdown(md: string) {
-    const parts: Array<{ type: "code" | "text"; lang?: string; content: string }> = [];
+    const parts: Array<{
+      type: "code" | "text";
+      lang?: string;
+      content: string;
+    }> = [];
     const regex = /```([a-zA-Z0-9_-]+)?\\n([\\s\\S]*?)```/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -419,11 +564,15 @@ function ChatPanel() {
                   Copy
                 </Button>
               </div>
-              <pre className="p-2 text-xs overflow-auto"><code>{p.content}</code></pre>
+              <pre className="p-2 text-xs overflow-auto">
+                <code>{p.content}</code>
+              </pre>
             </div>
           ) : (
-            <div key={i} className="text-sm whitespace-pre-wrap">{p.content}</div>
-          )
+            <div key={i} className="text-sm whitespace-pre-wrap">
+              {p.content}
+            </div>
+          ),
         )}
       </div>
     );
@@ -444,9 +593,12 @@ function ChatPanel() {
               value={providerId}
               onChange={(e) => setProviderId(e.currentTarget.value)}
             >
-              {Object.keys(registry).map((id) => (
-                <option key={id} value={id}>{registry[id].def.name}</option>
-              ))}
+              {registry &&
+                Object.keys(registry).map((id) => (
+                  <option key={id} value={id}>
+                    {registry[id].def.name}
+                  </option>
+                ))}
             </select>
           </label>
           <label className="text-xs md:col-span-2">
@@ -458,7 +610,9 @@ function ChatPanel() {
               onChange={(e) => setModel(e.currentTarget.value)}
             >
               {modelsForProvider.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </label>
@@ -474,7 +628,10 @@ function ChatPanel() {
               />
               Use selected file as context
             </label>
-            <label className="text-xs flex items-center gap-1" title="Maximum characters from the context file to include">
+            <label
+              className="text-xs flex items-center gap-1"
+              title="Maximum characters from the context file to include"
+            >
               <span>Max ctx</span>
               <input
                 className="h-7 w-20 rounded-md border border-input px-2 text-xs"
@@ -482,29 +639,56 @@ function ChatPanel() {
                 min={500}
                 step={500}
                 value={maxContextChars}
-                onChange={(e) => setMaxContextChars(Math.max(0, Number(e.currentTarget.value || 0)))}
+                onChange={(e) =>
+                  setMaxContextChars(
+                    Math.max(0, Number(e.currentTarget.value || 0)),
+                  )
+                }
                 aria-label="Max context characters"
               />
             </label>
-            {useContextFile && currentFileContent.length > maxContextChars && !contextExpanded && (
-              <Button variant="ghost" size="sm" onClick={() => setContextExpanded(true)} aria-label="Show full context">Show full</Button>
-            )}
-            {useContextFile && contextExpanded && currentFileContent.length > maxContextChars && (
-              <Button variant="ghost" size="sm" onClick={() => setContextExpanded(false)} aria-label="Show less context">Show less</Button>
-            )}
+            {useContextFile &&
+              currentFileContent.length > maxContextChars &&
+              !contextExpanded && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setContextExpanded(true)}
+                  aria-label="Show full context"
+                >
+                  Show full
+                </Button>
+              )}
+            {useContextFile &&
+              contextExpanded &&
+              currentFileContent.length > maxContextChars && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setContextExpanded(false)}
+                  aria-label="Show less context"
+                >
+                  Show less
+                </Button>
+              )}
           </div>
           <div className="flex items-center gap-3">
             <label className="text-xs flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={useTargetCurrentFile}
-                onChange={(e) => setUseTargetCurrentFile(e.currentTarget.checked)}
+                onChange={(e) =>
+                  setUseTargetCurrentFile(e.currentTarget.checked)
+                }
                 aria-label="Use current file as target"
               />
               Use current file as target
             </label>
           </div>
-          <div className="text-xs text-muted-foreground md:text-right" aria-live="polite">
+          <div
+            className="text-xs text-muted-foreground md:text-right"
+            aria-live="polite"
+          >
             {imageHint ? <span className="mr-2">{imageHint}</span> : null}
             {status}
           </div>
@@ -519,7 +703,11 @@ function ChatPanel() {
               onChange={(e) => setPrompt(e.currentTarget.value)}
             />
             {!streaming ? (
-              <Button onClick={send} disabled={!prompt.trim()} aria-label="Send">
+              <Button
+                onClick={send}
+                disabled={!prompt.trim()}
+                aria-label="Send"
+              >
                 Send
               </Button>
             ) : (
@@ -543,32 +731,81 @@ function ChatPanel() {
               accept=""
               onChange={async (e) => {
                 const files = Array.from(e.currentTarget.files || []);
-                const newItems: Array<{ name: string; type: string; size: number; text?: string; note?: string }> = [];
+                const newItems: Array<{
+                  name: string;
+                  type: string;
+                  size: number;
+                  text?: string;
+                  note?: string;
+                }> = [];
                 for (const f of files) {
                   const isImage = f.type.startsWith("image/");
-                  const isText = f.type.startsWith("text/") || [".js",".ts",".tsx",".jsx",".json",".css",".html",".md",".yml",".yaml",".py",".sh",".bash"].some(ext => f.name.endsWith(ext));
+                  const isText =
+                    f.type.startsWith("text/") ||
+                    [
+                      ".js",
+                      ".ts",
+                      ".tsx",
+                      ".jsx",
+                      ".json",
+                      ".css",
+                      ".html",
+                      ".md",
+                      ".yml",
+                      ".yaml",
+                      ".py",
+                      ".sh",
+                      ".bash",
+                    ].some((ext) => f.name.endsWith(ext));
                   if (isText) {
                     const txt = await f.text();
                     const sliced = txt.slice(0, maxAttachmentChars);
-                    const note = txt.length > maxAttachmentChars ? `truncated to ${sliced.length} of ${txt.length} chars` : undefined;
-                    newItems.push({ name: f.name, type: f.type || "text/plain", size: f.size, text: sliced, note });
-                  } else if (isImage && includeImagesAsDataUrl && providerCaps.vision) {
+                    const note =
+                      txt.length > maxAttachmentChars
+                        ? `truncated to ${sliced.length} of ${txt.length} chars`
+                        : undefined;
+                    newItems.push({
+                      name: f.name,
+                      type: f.type || "text/plain",
+                      size: f.size,
+                      text: sliced,
+                      note,
+                    });
+                  } else if (
+                    isImage &&
+                    includeImagesAsDataUrl &&
+                    providerCaps.vision
+                  ) {
                     const buf = await new Promise<string>((resolve) => {
                       const reader = new FileReader();
                       reader.onload = () => resolve(reader.result as string);
                       reader.readAsDataURL(f);
                     });
-                    newItems.push({ name: f.name, type: f.type || "image/*", size: f.size, text: buf, note: "included as data URL" });
+                    newItems.push({
+                      name: f.name,
+                      type: f.type || "image/*",
+                      size: f.size,
+                      text: buf,
+                      note: "included as data URL",
+                    });
                   } else {
-                    newItems.push({ name: f.name, type: f.type || "application/octet-stream", size: f.size, note: "binary/image omitted" });
+                    newItems.push({
+                      name: f.name,
+                      type: f.type || "application/octet-stream",
+                      size: f.size,
+                      note: "binary/image omitted",
+                    });
                   }
                 }
-                setAttachments(prev => [...prev, ...newItems]);
+                setAttachments((prev) => [...prev, ...newItems]);
                 // reset
                 (e.target as HTMLInputElement).value = "";
               }}
             />
-            <label className="text-xs flex items-center gap-1" title="Max characters read from each text attachment">
+            <label
+              className="text-xs flex items-center gap-1"
+              title="Max characters read from each text attachment"
+            >
               <span>Max attach</span>
               <input
                 className="h-7 w-20 rounded-md border border-input px-2 text-xs"
@@ -576,22 +813,42 @@ function ChatPanel() {
                 min={1000}
                 step={1000}
                 value={maxAttachmentChars}
-                onChange={(e) => setMaxAttachmentChars(Math.max(0, Number(e.currentTarget.value || 0)))}
+                onChange={(e) =>
+                  setMaxAttachmentChars(
+                    Math.max(0, Number(e.currentTarget.value || 0)),
+                  )
+                }
                 aria-label="Max attachment characters"
               />
             </label>
-            <label className="text-xs flex items-center gap-2" title={providerCaps.vision ? "Include images as data URLs" : "Provider does not support vision"}>
+            <label
+              className="text-xs flex items-center gap-2"
+              title={
+                providerCaps.vision
+                  ? "Include images as data URLs"
+                  : "Provider does not support vision"
+              }
+            >
               <input
                 type="checkbox"
                 checked={includeImagesAsDataUrl}
-                onChange={(e) => setIncludeImagesAsDataUrl(e.currentTarget.checked)}
+                onChange={(e) =>
+                  setIncludeImagesAsDataUrl(e.currentTarget.checked)
+                }
                 disabled={!providerCaps.vision}
                 aria-label="Include images as data URLs"
               />
               Include images
             </label>
             {attachments.length > 0 && (
-              <Button variant="ghost" size="sm" aria-label="Clear attachments" onClick={() => setAttachments([])}>Clear attachments</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Clear attachments"
+                onClick={() => setAttachments([])}
+              >
+                Clear attachments
+              </Button>
             )}
           </div>
           {attachments.length > 0 && (
@@ -599,11 +856,29 @@ function ChatPanel() {
               <div className="font-medium mb-1">Attachments</div>
               <ul className="space-y-1">
                 {attachments.map((a, idx) => (
-                  <li key={idx} className="flex items-center justify-between gap-2">
+                  <li
+                    key={idx}
+                    className="flex items-center justify-between gap-2"
+                  >
                     <div className="truncate">
-                      {a.name} <span className="text-muted-foreground">({a.type || "unknown"}, {a.size} bytes{a.note ? `, ${a.note}` : ""})</span>
+                      {a.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({a.type || "unknown"}, {a.size} bytes
+                        {a.note ? `, ${a.note}` : ""})
+                      </span>
                     </div>
-                    <Button variant="ghost" size="sm" aria-label={`Remove ${a.name}`} onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}>Remove</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove ${a.name}`}
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((_, i) => i !== idx),
+                        )
+                      }
+                    >
+                      Remove
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -621,7 +896,11 @@ function ChatPanel() {
         />
         <div className="text-xs font-medium mt-1">Rendered preview</div>
         <div className="border rounded-md p-2 max-h-56 overflow-auto">
-          {output ? renderMarkdown(output) : <div className="text-xs text-muted-foreground">No output yet</div>}
+          {output ? (
+            renderMarkdown(output)
+          ) : (
+            <div className="text-xs text-muted-foreground">No output yet</div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -631,7 +910,11 @@ function ChatPanel() {
             value={targetPath}
             onChange={(e) => setTargetPath(e.currentTarget.value)}
             disabled={useTargetCurrentFile}
-            title={useTargetCurrentFile ? "Using current file as target" : "Set a custom target file"}
+            title={
+              useTargetCurrentFile
+                ? "Using current file as target"
+                : "Set a custom target file"
+            }
           />
           <Button
             variant="secondary"
@@ -641,7 +924,13 @@ function ChatPanel() {
           >
             Stage to file
           </Button>
-          <Button variant="ghost" onClick={() => setOutput("")} disabled={!output}>Clear</Button>
+          <Button
+            variant="ghost"
+            onClick={() => setOutput("")}
+            disabled={!output}
+          >
+            Clear
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -700,7 +989,14 @@ function TerminalPanel() {
       <CardHeader className="justify-between">
         <CardTitle>Terminal</CardTitle>
         <div className="ml-auto flex gap-2">
-          <Button variant="secondary" onClick={clear} aria-label="Clear terminal" title="Clear">Clear</Button>
+          <Button
+            variant="secondary"
+            onClick={clear}
+            aria-label="Clear terminal"
+            title="Clear"
+          >
+            Clear
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="grow">
@@ -713,7 +1009,15 @@ function TerminalPanel() {
 }
 
 function QuickActions() {
-  const { createProject, exportZip, importZip, current, loadProjects, projects, openProject } = useProjectStore();
+  const {
+    createProject,
+    exportZip,
+    importZip,
+    current,
+    loadProjects,
+    projects,
+    openProject,
+  } = useProjectStore();
   const [name, setName] = React.useState("");
   const fileInput = React.useRef<HTMLInputElement>(null);
 
@@ -755,17 +1059,32 @@ function QuickActions() {
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
         />
-        <Button onClick={doCreate} disabled={!name.trim()}>Create</Button>
+        <Button onClick={doCreate} disabled={!name.trim()}>
+          Create
+        </Button>
       </div>
       <div className="flex items-center gap-2">
-        <input ref={fileInput} aria-label="Import ZIP" type="file" accept=".zip" onChange={onImport} />
-        <Button onClick={doExport} disabled={!current}>Export ZIP</Button>
+        <input
+          ref={fileInput}
+          aria-label="Import ZIP"
+          type="file"
+          accept=".zip"
+          onChange={onImport}
+        />
+        <Button onClick={doExport} disabled={!current}>
+          Export ZIP
+        </Button>
       </div>
       <div>
         <div className="text-xs text-muted-foreground mb-1">Projects</div>
         <div className="flex flex-wrap gap-2">
           {projects.map((p) => (
-            <Button key={p.id} variant="secondary" onClick={() => openProject(p.id)} aria-label={`Open ${p.name}`}>
+            <Button
+              key={p.id}
+              variant="secondary"
+              onClick={() => openProject(p.id)}
+              aria-label={`Open ${p.name}`}
+            >
               {p.name}
             </Button>
           ))}
@@ -776,10 +1095,12 @@ function QuickActions() {
 }
 
 import { FileTree } from "./features/files/FileTree";
-import { SearchBar } from "./features/search/SearchBar";
 import { useTerminalStore } from "./lib/store/terminalStore";
 import { SnapshotList } from "./features/snapshots/SnapshotList";
-import { CommandPalette, useCommandPalette } from "./features/commands/CommandPalette";
+import {
+  CommandPalette,
+  useCommandPalette,
+} from "./features/commands/CommandPalette";
 import { GitPanel } from "./features/git/GitPanel";
 import { DeployPanel } from "./features/deploy/DeployPanel";
 import { TemplatesGallery } from "./features/templates/TemplatesGallery";
@@ -790,40 +1111,78 @@ export default function App() {
     <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main id="main" className="max-w-screen-2xl mx-auto p-4">
-        <section aria-label="Quick Actions" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <section
+          aria-label="Quick Actions"
+          className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4"
+        >
           <Card>
-            <CardHeader><CardTitle>Providers</CardTitle></CardHeader>
-            <CardContent><ProviderManager /></CardContent>
+            <CardHeader>
+              <CardTitle>Providers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ProviderManager />
+            </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Projects</CardTitle></CardHeader>
-            <CardContent><QuickActions /></CardContent>
+            <CardHeader>
+              <CardTitle>Projects</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <QuickActions />
+            </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Templates</CardTitle></CardHeader>
-            <CardContent><TemplatesGallery /></CardContent>
+            <CardHeader>
+              <CardTitle>Templates</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TemplatesGallery />
+            </CardContent>
           </Card>
         </section>
-        <section aria-label="Integrations" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <section
+          aria-label="Integrations"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"
+        >
           <Card>
-            <CardHeader><CardTitle>Git</CardTitle></CardHeader>
-            <CardContent><GitPanel /></CardContent>
+            <CardHeader>
+              <CardTitle>Git</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GitPanel />
+            </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Deploy</CardTitle></CardHeader>
-            <CardContent><DeployPanel /></CardContent>
+            <CardHeader>
+              <CardTitle>Deploy</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DeployPanel />
+            </CardContent>
           </Card>
         </section>
         <section aria-label="Workbench" className="h-[70vh]">
-          <SplitPane dir="vertical" sizes={[26, 38, 36]} storageKey="bf_split_workbench">
+          <SplitPane
+            dir="vertical"
+            sizes={[26, 38, 36]}
+            storageKey="bf_split_workbench"
+          >
             <div className="pr-2 space-y-4">
               <Card>
-                <CardHeader><CardTitle>Files</CardTitle></CardHeader>
-                <CardContent><FileTree /></CardContent>
+                <CardHeader>
+                  <CardTitle>Files</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FileTree />
+                </CardContent>
               </Card>
               <Card>
-                <CardHeader><CardTitle>Snapshots</CardTitle></CardHeader>
-                <CardContent><SnapshotList /></CardContent>
+                <CardHeader>
+                  <CardTitle>Snapshots</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SnapshotList />
+                </CardContent>
               </Card>
               <TerminalPanel />
             </div>

@@ -13,8 +13,16 @@ describe("DeployPanel flows (Netlify & Vercel)", () => {
         name: "proj",
         createdAt: Date.now(),
         files: [
-          { path: "dist/index.html", contents: "<!doctype html>", updatedAt: Date.now() },
-          { path: "dist/app.js", contents: "console.log(1)", updatedAt: Date.now() },
+          {
+            path: "dist/index.html",
+            contents: "<!doctype html>",
+            updatedAt: Date.now(),
+          },
+          {
+            path: "dist/app.js",
+            contents: "console.log(1)",
+            updatedAt: Date.now(),
+          },
         ],
         snapshots: [],
       },
@@ -31,19 +39,32 @@ describe("DeployPanel flows (Netlify & Vercel)", () => {
   it("Netlify hash-based deploy uploads required files", async () => {
     // 1) create deploy response with required files
     const required = ["/index.html", "/app.js"];
-    const createResp = { id: "dep1", required, deploy_uploads_url: "https://api.netlify.com/deploys/dep1/files" };
-    const fetchMock = vi.fn()
+    const createResp = {
+      id: "dep1",
+      required,
+      deploy_uploads_url: "https://api.netlify.com/deploys/dep1/files",
+    };
+    const fetchMock = vi
+      .fn()
       // create
-      .mockResolvedValueOnce(new Response(JSON.stringify(createResp), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(createResp), { status: 200 }),
+      )
       // upload index.html
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
       // upload app.js
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock as any);
 
-    const { getByLabelText, getByRole } = render(<DeployPanel />);
-    fireEvent.change(getByLabelText("Netlify token"), { target: { value: "tok" } });
-    fireEvent.change(getByLabelText("Netlify site id"), { target: { value: "site" } });
+    const { getByLabelText, getByRole } = render(
+      React.createElement(DeployPanel),
+    );
+    fireEvent.change(getByLabelText("Netlify token"), {
+      target: { value: "tok" },
+    });
+    fireEvent.change(getByLabelText("Netlify site id"), {
+      target: { value: "site" },
+    });
     await fireEvent.click(getByRole("button", { name: "Deploy to Netlify" }));
 
     await waitFor(() => {
@@ -52,7 +73,8 @@ describe("DeployPanel flows (Netlify & Vercel)", () => {
   });
 
   it("Vercel project linking create and deploy", async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       // get project 404
       .mockResolvedValueOnce(new Response("", { status: 404 }))
       // create project ok
@@ -61,9 +83,15 @@ describe("DeployPanel flows (Netlify & Vercel)", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock as any);
 
-    const { getByLabelText, getByRole } = render(<DeployPanel />);
-    fireEvent.change(getByLabelText("Vercel token"), { target: { value: "vtok" } });
-    fireEvent.change(getByLabelText("Project name"), { target: { value: "proj" } });
+    const { getByLabelText, getByRole } = render(
+      React.createElement(DeployPanel),
+    );
+    fireEvent.change(getByLabelText("Vercel token"), {
+      target: { value: "vtok" },
+    });
+    fireEvent.change(getByLabelText("Project name"), {
+      target: { value: "proj" },
+    });
     await fireEvent.click(getByRole("button", { name: "Deploy to Vercel" }));
 
     await waitFor(() => {

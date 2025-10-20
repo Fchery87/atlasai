@@ -23,7 +23,13 @@ vi.mock("../lib/oauth/github", async (orig) => {
 describe("GitPanel branch defaults", () => {
   beforeEach(() => {
     useProjectStore.setState({
-      current: { id: "proj1", name: "P1", createdAt: Date.now(), files: [], snapshots: [] },
+      current: {
+        id: "proj1",
+        name: "P1",
+        createdAt: Date.now(),
+        files: [],
+        snapshots: [],
+      },
       projects: [],
       loading: false,
       error: undefined,
@@ -35,7 +41,7 @@ describe("GitPanel branch defaults", () => {
   });
 
   it("prefills branch from saved per-project branch; falls back to default branch", async () => {
-    render(<GitPanel />);
+    render(React.createElement(GitPanel));
     const input = await screen.findByLabelText("Branch");
     expect((input as HTMLInputElement).value).toBe("feature-x");
     // Changing branch saves via saveEncrypted (mocked)
