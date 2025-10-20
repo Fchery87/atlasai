@@ -40,6 +40,7 @@ type Actions = {
   stageDiff: (path: string, after?: string) => void;
   approveDiff: () => Promise<void>;
   undoLastApply: () => Promise<void>;
+  redoLastApply: () => Promise<void>;
   rejectDiff: () => void;
   exportZip: () => Promise<Blob>;
   importZip: (file: File) => Promise<Project>;
@@ -118,7 +119,11 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     set({ loading: true });
     try {
       const recs = await listProjects();
-      const list = recs.map((r) => ({ id: r.id, name: r.data.name as string, createdAt: r.data.createdAt as number }));
+      const list = recs.map((r) => ({
+        id: r.id,
+        name: r.data.name as string,
+        createdAt: r.data.createdAt as number,
+      }));
       set({ projects: list, loading: false });
     } catch (e: any) {
       set({ loading: false, error: e?.message ?? "Failed to list projects" });
@@ -127,10 +132,19 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
 
   async createProject(name) {
     const now = Date.now();
-    const proj: Project = { id: uuidv4(), name, createdAt: now, files: [], snapshots: [] };
+    const proj: Project = {
+      id: uuidv4(),
+      name,
+      createdAt: now,
+      files: [],
+      snapshots: [],
+    };
     await putProject({ id: proj.id, data: proj });
     set((s) => ({
-      projects: [...s.projects, { id: proj.id, name: proj.name, createdAt: proj.createdAt }],
+      projects: [
+        ...s.projects,
+        { id: proj.id, name: proj.name, createdAt: proj.createdAt },
+      ],
       current: proj,
       previewHtml: buildPreviewHTML(proj),
     }));
@@ -145,10 +159,17 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
 
   async renameProject(id, name) {
     const state = get();
-    const cur = state.current && state.current.id === id ? { ...state.current, name } : state.current;
+    const cur =
+      state.current && state.current.id === id
+        ? { ...state.current, name }
+        : state.current;
     if (cur && cur.id === id) {
       await putProject({ id, data: cur });
-      set({ current: cur, projects: state.projects.map((p) => (p.id === id ? { ...p, name } : p)), previewHtml: buildPreviewHTML(cur) });
+      set({
+        current: cur,
+        projects: state.projects.map((p) => (p.id === id ? { ...p, name } : p)),
+        previewHtml: buildPreviewHTML(cur),
+      });
     }
   },
 
@@ -163,9 +184,16 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       throw new Error("File already exists");
     }
     const now = Date.now();
-    const updated: Project = { ...state.current, files: [...state.current.files, { path, contents: "", updatedAt: now }] };
+    const updated: Project = {
+      ...state.current,
+      files: [...state.current.files, { path, contents: "", updatedAt: now }],
+    };
     await putProject({ id: updated.id, data: updated });
-    set({ current: updated, currentFilePath: path, previewHtml: buildPreviewHTML(updated) });
+    set({
+      current: updated,
+      currentFilePath: path,
+      previewHtml: buildPreviewHTML(updated),
+    });
   },
 
   async renameFile(oldPath, newPath) {
@@ -174,10 +202,17 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     if (state.current.files.some((f) => f.path === newPath)) {
       throw new Error("Target exists");
     }
-    const files = state.current.files.map((f) => (f.path === oldPath ? { ...f, path: newPath, updatedAt: Date.now() } : f));
+    const files = state.current.files.map((f) =>
+      f.path === oldPath ? { ...f, path: newPath, updatedAt: Date.now() } : f,
+    );
     const updated: Project = { ...state.current, files };
     await putProject({ id: updated.id, data: updated });
-    set({ current: updated, currentFilePath: state.currentFilePath === oldPath ? newPath : state.currentFilePath, previewHtml: buildPreviewHTML(updated) });
+    set({
+      current: updated,
+      currentFilePath:
+        state.currentFilePath === oldPath ? newPath : state.currentFilePath,
+      previewHtml: buildPreviewHTML(updated),
+    });
   },
 
   async upsertFile(path, contents) {
@@ -203,14 +238,27 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     const files = state.current.files.filter((f) => f.path !== path);
     const updated: Project = { ...state.current, files };
     await putProject({ id: updated.id, data: updated });
-    set({ current: updated, previewHtml: buildPreviewHTML(updated), currentFilePath: state.currentFilePath === path ? undefined : state.currentFilePath });
+    set({
+      current: updated,
+      previewHtml: buildPreviewHTML(updated),
+      currentFilePath:
+        state.currentFilePath === path ? undefined : state.currentFilePath,
+    });
   },
 
   async snapshot(label) {
     const state = get();
     if (!state.current) throw new Error("No project open");
-    const snap: Snapshot = { id: uuidv4(), label, createdAt: Date.now(), files: state.current.files.map((f) => ({ ...f })) };
-    const updated: Project = { ...state.current, snapshots: [...state.current.snapshots, snap] };
+    const snap: Snapshot = {
+      id: uuidv4(),
+      label,
+      createdAt: Date.now(),
+      files: state.current.files.map((f) => ({ ...f })),
+    };
+    const updated: Project = {
+      ...state.current,
+      snapshots: [...state.current.snapshots, snap],
+    };
     await putProject({ id: updated.id, data: updated });
     set({ current: updated });
     return snap;
@@ -221,7 +269,11 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     if (!state.current) throw new Error("No project open");
     const snap = state.current.snapshots.find((s) => s.id === id);
     if (!snap) throw new Error("Snapshot not found");
-    const updated: Project = { ...state.current, files: snap.files.map((f) => ({ ...f })), snapshots: state.current.snapshots };
+    const updated: Project = {
+      ...state.current,
+      files: snap.files.map((f) => ({ ...f })),
+      snapshots: state.current.snapshots,
+    };
     await putProject({ id: updated.id, data: updated });
     set({ current: updated, previewHtml: buildPreviewHTML(updated) });
   },
@@ -231,7 +283,14 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     if (!state.current) throw new Error("No project open");
     const existing = state.current.files.find((f) => f.path === path);
     const before = existing?.contents ?? "";
-    const op: "add" | "modify" | "delete" = after === undefined ? (existing ? "delete" : "add") : existing ? "modify" : "add";
+    const op: "add" | "modify" | "delete" =
+      after === undefined
+        ? existing
+          ? "delete"
+          : "add"
+        : existing
+          ? "modify"
+          : "add";
     set({ staged: { path, before, after: after ?? "", op } });
   },
 
@@ -248,7 +307,11 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
         await get().upsertFile(state.staged.path, state.staged.after);
       }
       // push to undo stack and clear redo
-      set({ undoStack: [...get().undoStack, state.staged], redoStack: [], staged: undefined });
+      set({
+        undoStack: [...get().undoStack, state.staged],
+        redoStack: [],
+        staged: undefined,
+      });
     } finally {
       set({ fileLock: false });
     }
@@ -256,8 +319,8 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
 
   async undoLastApply() {
     const state = get();
-    if (!state.current || get().undoStack.length === 0) return;
-    const la = get().undoStack[get().undoStack.length - 1];
+    if (!state.current || state.undoStack.length === 0) return;
+    const la = state.undoStack[state.undoStack.length - 1];
     if (la.op === "delete") {
       // bring file back with before content
       await get().upsertFile(la.path, la.before);
@@ -268,19 +331,25 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       // modify: restore before
       await get().upsertFile(la.path, la.before);
     }
-    set({ undoStack: get().undoStack.slice(0, -1), redoStack: [...get().redoStack, la] });
+    set({
+      undoStack: state.undoStack.slice(0, -1),
+      redoStack: [...state.redoStack, la],
+    });
   },
 
   async redoLastApply() {
     const state = get();
-    if (!state.current || get().redoStack.length === 0) return;
-    const ra = get().redoStack[get().redoStack.length - 1];
+    if (!state.current || state.redoStack.length === 0) return;
+    const ra = state.redoStack[state.redoStack.length - 1];
     if (ra.op === "delete") {
       await get().deleteFile(ra.path);
     } else {
       await get().upsertFile(ra.path, ra.after);
     }
-    set({ redoStack: get().redoStack.slice(0, -1), undoStack: [...get().undoStack, ra] });
+    set({
+      redoStack: state.redoStack.slice(0, -1),
+      undoStack: [...state.undoStack, ra],
+    });
   },
 
   rejectDiff() {
@@ -307,11 +376,20 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       const contents = await entry.async("string");
       files.push({ path: entry.name, contents, updatedAt: now });
     }
-    const proj: Project = { id: uuidv4(), name: file.name.replace(/\.zip$/i, ""), createdAt: now, files, snapshots: [] };
+    const proj: Project = {
+      id: uuidv4(),
+      name: file.name.replace(/\.zip$/i, ""),
+      createdAt: now,
+      files,
+      snapshots: [],
+    };
     await putProject({ id: proj.id, data: proj });
     const state = get();
     set({
-      projects: [...state.projects, { id: proj.id, name: proj.name, createdAt: proj.createdAt }],
+      projects: [
+        ...state.projects,
+        { id: proj.id, name: proj.name, createdAt: proj.createdAt },
+      ],
       current: proj,
       previewHtml: buildPreviewHTML(proj),
     });

@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("Prompt → Diff → Apply → Preview end-to-end (mocked adapter streams)", async ({ page }) => {
+test("Prompt → Diff → Apply → Preview end-to-end (mocked adapter streams)", async ({
+  page,
+}) => {
   await page.goto("/");
 
   // Create project
@@ -15,7 +17,9 @@ test("Prompt → Diff → Apply → Preview end-to-end (mocked adapter streams)"
 
   // Open index.html and add minimal content
   await page.getByRole("button", { name: "Open index.html" }).click();
-  await page.keyboard.type("<!doctype html><html><body><div id='root'>Hello</div></body></html>");
+  await page.keyboard.type(
+    "<!doctype html><html><body><div id='root'>Hello</div></body></html>",
+  );
   // Save
   await page.getByRole("button", { name: "Save" }).click();
 
@@ -23,18 +27,21 @@ test("Prompt → Diff → Apply → Preview end-to-end (mocked adapter streams)"
   await page.getByLabel("Provider").selectOption("gpt5");
   await page.getByLabel("Model").selectOption("gpt-5-code-preview");
 
-  // Fill prompt and mock streaming response
-  await page.getByLabel("Prompt").fill("Replace Hello with World and add a style");
-  await page.route("**/v1/chat/completions", (route) => {
-    // not used for GPT-5 placeholder, but route anyway
-    route.fulfill({ status: 200, body: JSON.stringify({}) });
-  });
+  // Fill prompt - this will trigger the GPT-5 placeholder to stream the expected response
+  await page
+    .getByLabel("Prompt")
+    .fill("Replace Hello with World and add a style");
 
-  // Send (GPT-5 placeholder will stream static chunks we display)
+  // Send (GPT-5 placeholder will stream the response)
   await page.getByRole("button", { name: "Send" }).click();
 
-  // Simulate output by injecting text into the editable area (since GPT-5 is placeholder)
-  await page.getByLabel("Assistant output").fill("<!doctype html><html><head><style>body{color:blue}</style></head><body><div id='root'>World</div></body></html>");
+  // Wait for streaming to complete - check for the "Done" status
+  await expect(page.getByText("Done")).toBeVisible({ timeout: 5000 });
+
+  // Verify the streamed output appears in the assistant output area
+  await expect(page.getByLabel("Assistant output")).toContainText(
+    "<!doctype html>",
+  );
 
   // Stage to file (target defaults to current file)
   await page.getByRole("button", { name: "Stage to file" }).click();

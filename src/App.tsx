@@ -80,6 +80,7 @@ function EditorPanel() {
     undoStack,
     redoStack,
     undoLastApply,
+    redoLastApply,
   } = useProjectStore();
   const file = current?.files.find((f) => f.path === currentFilePath);
   const [code, setCode] = React.useState<string>(
@@ -134,8 +135,13 @@ function EditorPanel() {
         onStage();
       } else if (k === "z") {
         e.preventDefault();
-        // undo
-        undoLastApply();
+        if (e.shiftKey) {
+          // redo
+          redoLastApply();
+        } else {
+          // undo
+          undoLastApply();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -152,6 +158,7 @@ function EditorPanel() {
     formatOnSave,
     lang,
     undoLastApply,
+    redoLastApply,
   ]);
 
   React.useEffect(() => {
@@ -235,8 +242,8 @@ function EditorPanel() {
               {redoStack.length > 0 && (
                 <Button
                   variant="ghost"
-                  onClick={() => {}}
-                  title="Redo last apply (not implemented)"
+                  onClick={redoLastApply}
+                  title="Redo last apply (Ctrl+Shift+Z)"
                 >
                   Redo
                 </Button>
