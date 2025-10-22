@@ -4,7 +4,11 @@
       "Bash(git add:*)",
       "Bash(git -c user.useConfigOnly=true commit --quiet --allow-empty-message --file -)",
       "Bash(cat:*)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(claude mcp:*)",
+      "Read(//home/teksmabrep/.claude/**)",
+      "Read(//home/teksmabrep/**)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
