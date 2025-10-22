@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-export const AuthType = z.enum(["apiKey", "bearer", "oauth", "none"]);
-export type AuthType = z.infer<typeof AuthType>;
+export const AuthTypeSchema = z.enum(["apiKey", "bearer", "oauth", "none"]);
+export type AuthType = z.infer<typeof AuthTypeSchema>;
 
-export const ModelSpec = z.object({
+export const ModelSpecSchema = z.object({
   id: z.string(),
   maxTokens: z.number().int().positive().optional(),
   inputCostPerMTokUSD: z.number().nonnegative().optional(),
@@ -11,23 +11,23 @@ export const ModelSpec = z.object({
   supportsVision: z.boolean().optional(),
   supportsTools: z.boolean().optional(),
 });
-export type ModelSpec = z.infer<typeof ModelSpec>;
+export type ModelSpec = z.infer<typeof ModelSpecSchema>;
 
-export const ProviderDefinition = z.object({
+export const ProviderDefinitionSchema = z.object({
   id: z.string(), // slug
   name: z.string(), // display
   baseUrl: z.string().url(),
   auth: z.object({
-    type: AuthType,
+    type: AuthTypeSchema,
     keyName: z.string().optional(), // header key, e.g., "x-api-key"
   }),
   headers: z.record(z.string()).optional(),
-  models: z.array(ModelSpec),
+  models: z.array(ModelSpecSchema),
 });
-export type ProviderDefinition = z.infer<typeof ProviderDefinition>;
+export type ProviderDefinition = z.infer<typeof ProviderDefinitionSchema>;
 
-export const ProviderRegistry = z.array(ProviderDefinition);
-export type ProviderRegistry = z.infer<typeof ProviderRegistry>;
+export const ProviderRegistrySchema = z.array(ProviderDefinitionSchema);
+export type ProviderRegistry = z.infer<typeof ProviderRegistrySchema>;
 
 export type CapabilitySet = {
   vision?: boolean;
@@ -51,7 +51,15 @@ export type StreamOptions = {
 };
 
 export interface ProviderAdapter {
-  validate(def: ProviderDefinition, creds: string): Promise<{ ok: boolean; message?: string }>;
-  stream(def: ProviderDefinition, creds: string, payload: ProviderPayload, opts?: StreamOptions): AsyncIterable<DeltaChunk>;
-  capabilities(def: ProviderDefinition): CapabilitySet;
+  validate(
+    _def: ProviderDefinition,
+    _creds: string,
+  ): Promise<{ ok: boolean; message?: string }>;
+  stream(
+    _def: ProviderDefinition,
+    _creds: string,
+    _payload: ProviderPayload,
+    _opts?: StreamOptions,
+  ): AsyncIterable<DeltaChunk>;
+  capabilities(_def: ProviderDefinition): CapabilitySet;
 }

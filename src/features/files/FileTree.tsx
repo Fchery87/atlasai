@@ -3,7 +3,9 @@ import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
 import { loadDecrypted, saveEncrypted } from "../../lib/oauth/github";
 
-type Node = { type: "folder"; name: string; path: string; children: Node[] } | { type: "file"; name: string; path: string };
+type Node =
+  | { type: "folder"; name: string; path: string; children: Node[] }
+  | { type: "file"; name: string; path: string };
 
 function buildTree(paths: string[]): Node[] {
   const root: Record<string, any> = {};
@@ -32,7 +34,12 @@ function buildTree(paths: string[]): Node[] {
           files.push({ type: "file", name: key, path: full });
         }
       } else {
-        folders.push({ type: "folder", name: key, path: full, children: toNodes(val, full) });
+        folders.push({
+          type: "folder",
+          name: key,
+          path: full,
+          children: toNodes(val, full),
+        });
       }
     }
     return [...folders, ...files];
@@ -73,7 +80,15 @@ function filterNodes(nodes: Node[], q: string): Node[] {
 }
 
 export function FileTree() {
-  const { current, selectFile, currentFilePath, deleteFile, snapshot, createFile, renameFile } = useProjectStore();
+  const {
+    current,
+    selectFile,
+    currentFilePath,
+    deleteFile,
+    snapshot,
+    createFile,
+    renameFile,
+  } = useProjectStore();
   const pid = current?.id;
   const files = current?.files ?? [];
   const [renaming, setRenaming] = React.useState<string | null>(null);
@@ -82,18 +97,30 @@ export function FileTree() {
 
   React.useEffect(() => {
     (async () => {
-      const v = await loadDecrypted(pid ? `sec_help_files:${pid}` : "sec_help_files");
+      const v = await loadDecrypted(
+        pid ? `sec_help_files:${pid}` : "sec_help_files",
+      );
       setShowHelp(v === "1");
     })();
   }, [pid]);
   React.useEffect(() => {
-    saveEncrypted(pid ? `sec_help_files:${pid}` : "sec_help_files", showHelp ? "1" : "0");
+    saveEncrypted(
+      pid ? `sec_help_files:${pid}` : "sec_help_files",
+      showHelp ? "1" : "0",
+    );
   }, [showHelp, pid]);
 
   React.useEffect(() => {
     const onReset = () => setShowHelp(false);
-    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
-    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+    window.addEventListener(
+      "bf:reset-ui-tips",
+      onReset as unknown as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "bf:reset-ui-tips",
+        onReset as unknown as EventListener,
+      );
   }, []);
 
   const [creating, setCreating] = React.useState<boolean>(false);
@@ -174,7 +201,10 @@ export function FileTree() {
       const anchorPath = anchor ?? list[0];
       const anchorIdx = list.indexOf(anchorPath);
       if (targetIdx !== -1 && anchorIdx !== -1) {
-        const [start, end] = targetIdx > anchorIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+        const [start, end] =
+          targetIdx > anchorIdx
+            ? [anchorIdx, targetIdx]
+            : [targetIdx, anchorIdx];
         const range = list.slice(start, end + 1);
         // Expand parents along the whole range to reveal selected files
         range.forEach((rp) => expandParents(rp));
@@ -226,7 +256,7 @@ export function FileTree() {
 
   const applyCreate = async () => {
     const raw = createValue.trim();
-    const parent = creatingPath;
+    const _parent = creatingPath;
     setCreating(false);
     setCreatingPath(null);
     if (!raw) return;
@@ -261,7 +291,7 @@ export function FileTree() {
     } else if (e.key === "F2") {
       e.preventDefault();
       startRename(currentFilePath);
-    } else if ((e.key.toLowerCase() === "n") && (e.ctrlKey || e.metaKey)) {
+    } else if (e.key.toLowerCase() === "n" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       startCreate();
     } else if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
@@ -271,7 +301,8 @@ export function FileTree() {
       e.preventDefault();
       if (list.length === 0) return;
       let nextIdx = curIdx;
-      if (e.key === "ArrowDown") nextIdx = Math.min(list.length - 1, curIdx + 1);
+      if (e.key === "ArrowDown")
+        nextIdx = Math.min(list.length - 1, curIdx + 1);
       else nextIdx = Math.max(0, curIdx - 1);
       const nextPath = list[nextIdx] ?? currentFilePath;
       expandParents(nextPath);
@@ -280,7 +311,10 @@ export function FileTree() {
         // extend selection from anchor to next
         const start = anchor ? list.indexOf(anchor) : 0;
         const [a, b] = nextIdx > start ? [start, nextIdx] : [nextIdx, start];
-        const range = list.slice(Math.max(0, a), Math.min(list.length - 1, b) + 1);
+        const range = list.slice(
+          Math.max(0, a),
+          Math.min(list.length - 1, b) + 1,
+        );
         setSelected(new Set(range));
       } else if (e.metaKey || e.ctrlKey) {
         // toggle only, don't change anchor
@@ -301,7 +335,10 @@ export function FileTree() {
     const expandPaths = (nodes: Node[]) => {
       nodes.forEach((n) => {
         if (n.type === "folder") {
-          if (n.children.length > 0 || n.name.toLowerCase().includes(q.toLowerCase())) {
+          if (
+            n.children.length > 0 ||
+            n.name.toLowerCase().includes(q.toLowerCase())
+          ) {
             setOpen((o) => ({ ...o, [n.path]: true }));
             expandPaths(n.children);
           }
@@ -312,7 +349,11 @@ export function FileTree() {
   }, [q, JSON.stringify(tree)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Context menu for folders
-  const [menu, setMenu] = React.useState<{ x: number; y: number; path: string } | null>(null);
+  const [menu, setMenu] = React.useState<{
+    x: number;
+    y: number;
+    path: string;
+  } | null>(null);
   React.useEffect(() => {
     const onClick = () => setMenu(null);
     window.addEventListener("click", onClick);
@@ -322,7 +363,11 @@ export function FileTree() {
   const renderNode = (node: Node) => {
     if (node.type === "file") {
       return (
-        <li key={node.path} data-path={node.path} className="flex items-center justify-between gap-2">
+        <li
+          key={node.path}
+          data-path={node.path}
+          className="flex items-center justify-between gap-2"
+        >
           <input
             type="checkbox"
             aria-label={`Select ${node.path}`}
@@ -336,7 +381,8 @@ export function FileTree() {
               defaultValue={node.path}
               onBlur={(e) => applyRename(node.path, e.currentTarget.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") applyRename(node.path, (e.target as HTMLInputElement).value);
+                if (e.key === "Enter")
+                  applyRename(node.path, (e.target as HTMLInputElement).value);
                 if (e.key === "Escape") setRenaming(null);
               }}
               className="flex-1 h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -352,14 +398,28 @@ export function FileTree() {
               aria-label={`Open ${node.path}`}
               title="Open"
             >
-              {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}
+              {typeof hilite(node.name, q) === "string"
+                ? node.name
+                : hilite(node.name, q)}
             </button>
           )}
           <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" aria-label={`Rename ${node.path}`} onClick={() => startRename(node.path)} title="Rename (F2)">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Rename ${node.path}`}
+              onClick={() => startRename(node.path)}
+              title="Rename (F2)"
+            >
               ✎
             </Button>
-            <Button size="sm" variant="ghost" aria-label={`Delete ${node.path}`} onClick={() => onDelete(node.path)} title="Delete (Del/Backspace)">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Delete ${node.path}`}
+              onClick={() => onDelete(node.path)}
+              title="Delete (Del/Backspace)"
+            >
               ✕
             </Button>
           </div>
@@ -381,11 +441,22 @@ export function FileTree() {
             aria-label={`Toggle ${node.name}`}
             title={isOpen ? "Collapse" : "Expand"}
           >
-            {isOpen ? "📂" : "📁"} {typeof hilite(node.name, q) === "string" ? node.name : hilite(node.name, q)}{" "}
-            {node.children.length === 0 && <span className="text-xs text-muted-foreground">(empty)</span>}
+            {isOpen ? "📂" : "📁"}{" "}
+            {typeof hilite(node.name, q) === "string"
+              ? node.name
+              : hilite(node.name, q)}{" "}
+            {node.children.length === 0 && (
+              <span className="text-xs text-muted-foreground">(empty)</span>
+            )}
           </button>
           <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" aria-label={`New in ${node.path}`} onClick={() => startCreate(node.path + "/", node.path)} title="New here">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`New in ${node.path}`}
+              onClick={() => startCreate(node.path + "/", node.path)}
+              title="New here"
+            >
               ＋
             </Button>
           </div>
@@ -410,7 +481,9 @@ export function FileTree() {
                   className="flex-1 h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={`New file in ${node.path}`}
                 />
-                <Button size="sm" onClick={applyCreate} title="Add">Add</Button>
+                <Button size="sm" onClick={applyCreate} title="Add">
+                  Add
+                </Button>
               </li>
             )}
             {node.children.map(renderNode)}
@@ -422,8 +495,17 @@ export function FileTree() {
 
   // Rubber-band (drag) selection
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const dragStart = React.useRef<{ x: number; y: number; union: boolean } | null>(null);
+  const [drag, setDrag] = React.useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
+  const dragStart = React.useRef<{
+    x: number;
+    y: number;
+    union: boolean;
+  } | null>(null);
 
   const onMouseDown = (e: React.MouseEvent) => {
     // Only left click and not on interactive elements
@@ -452,7 +534,9 @@ export function FileTree() {
     setDrag({ x: minX, y: minY, w, h });
 
     // Hit test file rows
-    const lis = Array.from(containerRef.current.querySelectorAll("li[data-path]")) as HTMLLIElement[];
+    const lis = Array.from(
+      containerRef.current.querySelectorAll("li[data-path]"),
+    ) as HTMLLIElement[];
     const hits: string[] = [];
     const abs = containerRef.current.getBoundingClientRect();
     for (const li of lis) {
@@ -461,7 +545,12 @@ export function FileTree() {
       const ry = r.top - abs.top;
       const rw = r.width;
       const rh = r.height;
-      const intersects = !(rx > minX + w || rx + rw < minX || ry > minY + h || ry + rh < minY);
+      const intersects = !(
+        rx > minX + w ||
+        rx + rw < minX ||
+        ry > minY + h ||
+        ry + rh < minY
+      );
       if (intersects) {
         const p = li.getAttribute("data-path");
         if (p) hits.push(p);
@@ -493,12 +582,21 @@ export function FileTree() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold flex items-center gap-2">
           Files
-          <Button variant="ghost" size="sm" onClick={() => setShowHelp(v => !v)} aria-label="Files help">?</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHelp((v) => !v)}
+            aria-label="Files help"
+          >
+            ?
+          </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              localStorage.removeItem(pid ? `sec_help_files:${pid}` : "sec_help_files");
+              localStorage.removeItem(
+                pid ? `sec_help_files:${pid}` : "sec_help_files",
+              );
               setShowHelp(false);
             }}
             aria-label="Reset Files UI tips"
@@ -510,12 +608,36 @@ export function FileTree() {
         <div className="flex items-center gap-2">
           {selected.size > 0 ? (
             <>
-              <Button size="sm" variant="destructive" onClick={deleteSelected} aria-label="Delete selected" title="Delete selected">Delete Selected</Button>
-              <Button size="sm" variant="secondary" onClick={clearSelection} aria-label="Clear selection" title="Clear selection">Clear</Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={deleteSelected}
+                aria-label="Delete selected"
+                title="Delete selected"
+              >
+                Delete Selected
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={clearSelection}
+                aria-label="Clear selection"
+                title="Clear selection"
+              >
+                Clear
+              </Button>
             </>
           ) : (
             <>
-              <Button size="sm" variant="secondary" onClick={() => startCreate("", "")} aria-label="Create file" title="New (Ctrl/Cmd+N)">New</Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => startCreate("", "")}
+                aria-label="Create file"
+                title="New (Ctrl/Cmd+N)"
+              >
+                New
+              </Button>
               <Button
                 size="sm"
                 variant="secondary"
@@ -534,17 +656,36 @@ export function FileTree() {
               >
                 New Folder
               </Button>
-              <Button size="sm" variant="secondary" onClick={onSnapshot} aria-label="Create snapshot" title="Create Snapshot">Snapshot</Button>
-              <Button size="sm" variant="ghost" onClick={selectAll} aria-label="Select all" title="Select all">Select All</Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onSnapshot}
+                aria-label="Create snapshot"
+                title="Create Snapshot"
+              >
+                Snapshot
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={selectAll}
+                aria-label="Select all"
+                title="Select all"
+              >
+                Select All
+              </Button>
             </>
           )}
         </div>
       </div>
       {showHelp && (
         <div className="text-xs text-muted-foreground border rounded-md p-2 mb-2">
-          - Use New to create files; end with “/” to create a folder placeholder (.keep).<br />
-          - Right-click a folder for context actions (new here, delete empty).<br />
-          - Multi-select with Shift/Ctrl/Cmd or drag to select; use Delete Selected.
+          - Use New to create files; end with “/” to create a folder placeholder
+          (.keep).
+          <br />
+          - Right-click a folder for context actions (new here, delete empty).
+          <br />- Multi-select with Shift/Ctrl/Cmd or drag to select; use Delete
+          Selected.
         </div>
       )}
       <div className="mb-2">
@@ -575,16 +716,26 @@ export function FileTree() {
               className="flex-1 h-8 rounded-md border border-input px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="New file path"
             />
-            <Button size="sm" onClick={applyCreate} title="Add">Add</Button>
+            <Button size="sm" onClick={applyCreate} title="Add">
+              Add
+            </Button>
           </li>
         )}
-        {tree.length > 0 ? tree.map((n) => {
-          if (n.type === "file") {
-            // ensure data-path on li via renderNode, fallback here if top-level
-            return <li key={n.path} data-path={n.path}>{renderNode(n)}</li>;
-          }
-          return renderNode(n);
-        }) : !creating && <li className="text-muted-foreground">No files yet</li>}
+        {tree.length > 0
+          ? tree.map((n) => {
+              if (n.type === "file") {
+                // ensure data-path on li via renderNode, fallback here if top-level
+                return (
+                  <li key={n.path} data-path={n.path}>
+                    {renderNode(n)}
+                  </li>
+                );
+              }
+              return renderNode(n);
+            })
+          : !creating && (
+              <li className="text-muted-foreground">No files yet</li>
+            )}
       </ul>
       {drag && (
         <div
@@ -620,7 +771,11 @@ export function FileTree() {
             className="block w-full text-left px-3 py-2 hover:bg-muted text-red-600"
             onClick={async () => {
               // Delete folder if empty (.keep allowed)
-              const hasNonKeep = (current?.files ?? []).some((f) => f.path.startsWith(menu.path + "/") && !f.path.endsWith("/.keep"));
+              const hasNonKeep = (current?.files ?? []).some(
+                (f) =>
+                  f.path.startsWith(menu.path + "/") &&
+                  !f.path.endsWith("/.keep"),
+              );
               if (hasNonKeep) {
                 alert("Folder is not empty.");
               } else {

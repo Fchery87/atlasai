@@ -28,38 +28,48 @@
 
 ## Missing Features
 
-### 4. Token/Cost Estimation
+### 4. ✅ Token/Cost Estimation - FIXED
 
 **PRD Reference**: Section 6.1
-**Issue**: Token/cost estimation in chat header is not implemented
-**Impact**: Users cannot track LLM usage costs
+**Fix**: Added token counting and cost estimation to chat interface header
+**Location**: [`App.tsx`](src/App.tsx:588-630), [`estimator.ts`](src/lib/tokens/estimator.ts)
+**Impact**: Users can now see estimated tokens and costs in real-time
 
-### 5. LLM Relay Implementation
+### 5. ✅ LLM Relay Implementation - FIXED
 
 **PRD Reference**: Section 10.3
-**Issue**: Optional LLM relay for secure API key proxy is missing
-**Impact**: Users must expose API keys directly in the browser
+**Fix**: Implemented optional LLM relay with Cloudflare Worker
+**Locations**:
 
-### 6. Full Shadcn Component Integration
+- Worker: [`worker/llm-relay.ts`](worker/llm-relay.ts)
+- Client: [`src/lib/relay/client.ts`](src/lib/relay/client.ts)
+- UI: [`src/features/relay/RelayConfig.tsx`](src/features/relay/RelayConfig.tsx)
+- Config: [`wrangler.toml`](wrangler.toml)
+  **Impact**: Users can optionally proxy requests through a relay server for enhanced security
+
+### 6. ✅ Full Shadcn Component Integration - FIXED
 
 **PRD Reference**: Section 9
-**Issue**: Only basic Shadcn components implemented, missing:
+**Fix**: Implemented all missing Shadcn components and made them accessible
+**Locations**:
 
-- Full Tabs implementation
-- Dialog/Sheet components
-- Form components with validation
-- Advanced patterns
-  **Impact**: Inconsistent UI and missing functionality
+- Tabs: [`src/components/ui/tabs.tsx`](src/components/ui/tabs.tsx)
+- Dialog: [`src/components/ui/dialog.tsx`](src/components/ui/dialog.tsx)
+- Sheet: [`src/components/ui/sheet.tsx`](src/components/ui/sheet.tsx)
+- Form: [`src/components/ui/form.tsx`](src/components/ui/form.tsx)
+- Showcase: [`src/components/examples/ComponentShowcase.tsx`](src/components/examples/ComponentShowcase.tsx)
+  **Access**: Open Command Palette (`Ctrl/Cmd+K`) → "Open UI Component Showcase"
+  **Impact**: Consistent UI components available throughout the application
 
-### 7. Performance Optimizations
+### 7. ✅ Performance Optimizations - FIXED
 
 **PRD Reference**: Section 7 (Performance)
-**Issues**:
+**Fixes**:
 
-- Monaco editor loaded eagerly instead of lazily
-- No debouncing for preview updates on file changes
-- Missing optimizations for large projects
-  **Impact**: Slower load times and poor performance with large codebases
+- ✅ Monaco editor now lazy-loaded: [`LazyMonaco.tsx`](src/components/editor/LazyMonaco.tsx:1-44)
+- ✅ Preview updates debounced: [`App.tsx`](src/App.tsx:953)
+- ✅ Large file warnings added: [`App.tsx`](src/App.tsx:92-99), [`limits.ts`](src/lib/perf/limits.ts)
+  **Impact**: Faster initial load times and better performance with large codebases
 
 ## Accessibility Gaps
 
@@ -103,20 +113,25 @@
 
 ## Recommendations
 
-### ✅ Immediate Fixes (High Priority) - COMPLETED
+### ✅ Immediate Fixes (High Priority) - ALL COMPLETED
 
 1. ✅ Implement redo functionality by connecting existing `redoLastApply` method
 2. ✅ Fix undo/redo stack management to use consistent state references
-3. Add token/cost estimation to chat interface
+3. ✅ Add token/cost estimation to chat interface
 4. ✅ Complete E2E test for full prompt-to-preview flow with actual streaming
+5. ✅ Implement lazy loading for Monaco editor
+6. ✅ Add debouncing for preview updates
+7. ✅ Implement full Shadcn component library
+8. ✅ Add LLM relay implementation
+9. ✅ Add large file warnings and performance limits
 
 ### Medium Priority
 
-1. Implement lazy loading for Monaco editor
-2. Add debouncing for preview updates
-3. Expand Shadcn component usage for better consistency
-4. Implement LLM relay for secure API key usage
-5. Add focus management and keyboard navigation
+1. ✅ Implement lazy loading for Monaco editor - COMPLETED
+2. ✅ Add debouncing for preview updates - COMPLETED
+3. ✅ Expand Shadcn component usage for better consistency - COMPLETED
+4. ✅ Implement LLM relay for secure API key usage - COMPLETED
+5. Add focus management and keyboard navigation (partially complete - Dialog/Sheet have focus traps)
 6. Implement ProviderAdapter contract tests
 
 ### Lower Priority

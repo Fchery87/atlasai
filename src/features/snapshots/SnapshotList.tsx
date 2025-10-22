@@ -9,7 +9,10 @@ type DiffSummary = {
   modified: string[];
 };
 
-function summarizeDiff(current: { path: string; contents: string }[], snap: { path: string; contents: string }[]): DiffSummary {
+function summarizeDiff(
+  current: { path: string; contents: string }[],
+  snap: { path: string; contents: string }[],
+): DiffSummary {
   const curMap = new Map(current.map((f) => [f.path, f.contents]));
   const snapMap = new Map(snap.map((f) => [f.path, f.contents]));
   const added: string[] = [];
@@ -33,19 +36,31 @@ export function SnapshotList() {
 
   React.useEffect(() => {
     (async () => {
-      const v = await loadDecrypted(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots");
+      const v = await loadDecrypted(
+        current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots",
+      );
       setShowHelp(v === "1");
     })();
   }, [current?.id]);
 
   React.useEffect(() => {
-    saveEncrypted(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots", showHelp ? "1" : "0");
+    saveEncrypted(
+      current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots",
+      showHelp ? "1" : "0",
+    );
   }, [showHelp, current?.id]);
 
   React.useEffect(() => {
     const onReset = () => setShowHelp(false);
-    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
-    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+    window.addEventListener(
+      "bf:reset-ui-tips",
+      onReset as unknown as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "bf:reset-ui-tips",
+        onReset as unknown as EventListener,
+      );
   }, []);
 
   const onRestore = async (id: string) => {
@@ -57,13 +72,11 @@ export function SnapshotList() {
 
   const selected = snaps.find((s) => s.id === previewId);
   const summary: DiffSummary | null =
-    selected && current
-      ? summarizeDiff(current.files, selected.files)
-      : null;
+    selected && current ? summarizeDiff(current.files, selected.files) : null;
 
   const openFileDiff = (path: string) => {
     if (!current || !selected) return;
-    const before = current.files.find((f) => f.path === path)?.contents ?? "";
+    const _before = current.files.find((f) => f.path === path)?.contents ?? "";
     const after = selected.files.find((f) => f.path === path)?.contents ?? "";
     // Only stage diffs for files that exist in snapshot (added or modified)
     if (after !== undefined) {
@@ -76,12 +89,23 @@ export function SnapshotList() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-medium">Snapshots</div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowHelp(v => !v)} aria-label="Snapshots help">?</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHelp((v) => !v)}
+            aria-label="Snapshots help"
+          >
+            ?
+          </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              localStorage.removeItem(current?.id ? `sec_help_snapshots:${current.id}` : "sec_help_snapshots");
+              localStorage.removeItem(
+                current?.id
+                  ? `sec_help_snapshots:${current.id}`
+                  : "sec_help_snapshots",
+              );
               setShowHelp(false);
             }}
             aria-label="Reset Snapshots UI tips"
@@ -93,9 +117,12 @@ export function SnapshotList() {
       </div>
       {showHelp && (
         <div className="text-xs text-muted-foreground border rounded-md p-2 mb-2">
-          - Snapshots capture file states. Select a snapshot to preview differences.<br />
-          - Click entries under Added/Modified to stage a diff; Removed can stage a delete.<br />
-          - Restore replaces current files with the snapshot’s files.
+          - Snapshots capture file states. Select a snapshot to preview
+          differences.
+          <br />
+          - Click entries under Added/Modified to stage a diff; Removed can
+          stage a delete.
+          <br />- Restore replaces current files with the snapshot’s files.
         </div>
       )}
       {snaps.length === 0 ? (
@@ -107,16 +134,27 @@ export function SnapshotList() {
               .slice()
               .sort((a, b) => b.createdAt - a.createdAt)
               .map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-2">
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2"
+                >
                   <button
                     className={`text-left flex-1 rounded px-2 py-1 hover:bg-muted ${previewId === s.id ? "bg-muted" : ""}`}
-                    onClick={() => setPreviewId((p) => (p === s.id ? null : s.id))}
+                    onClick={() =>
+                      setPreviewId((p) => (p === s.id ? null : s.id))
+                    }
                     aria-label={`Preview ${s.label}`}
                   >
                     <div className="font-medium">{s.label}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(s.createdAt).toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(s.createdAt).toLocaleString()}
+                    </div>
                   </button>
-                  <Button size="sm" onClick={() => onRestore(s.id)} aria-label={`Restore ${s.label}`}>
+                  <Button
+                    size="sm"
+                    onClick={() => onRestore(s.id)}
+                    aria-label={`Restore ${s.label}`}
+                  >
                     Restore
                   </Button>
                 </li>
@@ -130,7 +168,11 @@ export function SnapshotList() {
                 <ul className="mb-2">
                   {summary.added.map((p) => (
                     <li key={"a-" + p}>
-                      <button className="underline hover:no-underline" onClick={() => openFileDiff(p)} aria-label={`Diff ${p}`}>
+                      <button
+                        className="underline hover:no-underline"
+                        onClick={() => openFileDiff(p)}
+                        aria-label={`Diff ${p}`}
+                      >
                         {p}
                       </button>
                     </li>
@@ -155,7 +197,11 @@ export function SnapshotList() {
                 <ul className="mb-2">
                   {summary.modified.map((p) => (
                     <li key={"m-" + p}>
-                      <button className="underline hover:no-underline" onClick={() => openFileDiff(p)} aria-label={`Diff ${p}`}>
+                      <button
+                        className="underline hover:no-underline"
+                        onClick={() => openFileDiff(p)}
+                        aria-label={`Diff ${p}`}
+                      >
                         {p}
                       </button>
                     </li>

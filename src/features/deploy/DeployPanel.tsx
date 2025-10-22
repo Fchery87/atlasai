@@ -2,7 +2,11 @@ import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { useProjectStore } from "../../lib/store/projectStore";
 import JSZip from "jszip";
-import { getGitHubToken, saveEncrypted, loadDecrypted } from "../../lib/oauth/github";
+import {
+  getGitHubToken,
+  saveEncrypted,
+  loadDecrypted,
+} from "../../lib/oauth/github";
 
 type DeployTarget = "github-pages" | "netlify" | "vercel";
 
@@ -22,7 +26,8 @@ export function DeployPanel() {
   const [vercelToken, setVercelToken] = React.useState<string>("");
   const [vercelProject, setVercelProject] = React.useState<string>("");
   const [vercelFramework, setVercelFramework] = React.useState<string>("vite");
-  const [vercelBuildCmd, setVercelBuildCmd] = React.useState<string>("npm run build");
+  const [vercelBuildCmd, setVercelBuildCmd] =
+    React.useState<string>("npm run build");
   const [vercelOutDir, setVercelOutDir] = React.useState<string>("dist");
 
   const log = (line: string) => setLogs((l) => [...l, line]);
@@ -45,21 +50,44 @@ export function DeployPanel() {
   React.useEffect(() => {
     (async () => {
       const keys = [
-        [setNetlifyToken, ["sec_netlify_token", nsKey(pid, "sec_netlify_token")]],
-        [setNetlifySiteId, ["sec_netlify_site", nsKey(pid, "sec_netlify_site")]],
+        [
+          setNetlifyToken,
+          ["sec_netlify_token", nsKey(pid, "sec_netlify_token")],
+        ],
+        [
+          setNetlifySiteId,
+          ["sec_netlify_site", nsKey(pid, "sec_netlify_site")],
+        ],
         [setVercelToken, ["sec_vercel_token", nsKey(pid, "sec_vercel_token")]],
-        [setVercelProject, ["sec_vercel_project", nsKey(pid, "sec_vercel_project")]],
-        [setVercelFramework, ["sec_vercel_framework", nsKey(pid, "sec_vercel_framework")]],
-        [setVercelBuildCmd, ["sec_vercel_build_cmd", nsKey(pid, "sec_vercel_build_cmd")]],
-        [setVercelOutDir, ["sec_vercel_out_dir", nsKey(pid, "sec_vercel_out_dir")]],
-        [setGhRepo, ["sec_github_pages_repo", nsKey(pid, "sec_github_pages_repo")]],
+        [
+          setVercelProject,
+          ["sec_vercel_project", nsKey(pid, "sec_vercel_project")],
+        ],
+        [
+          setVercelFramework,
+          ["sec_vercel_framework", nsKey(pid, "sec_vercel_framework")],
+        ],
+        [
+          setVercelBuildCmd,
+          ["sec_vercel_build_cmd", nsKey(pid, "sec_vercel_build_cmd")],
+        ],
+        [
+          setVercelOutDir,
+          ["sec_vercel_out_dir", nsKey(pid, "sec_vercel_out_dir")],
+        ],
+        [
+          setGhRepo,
+          ["sec_github_pages_repo", nsKey(pid, "sec_github_pages_repo")],
+        ],
       ] as const;
 
       for (const [setter, [globalKey, projKey]] of keys) {
-        const v = (await loadDecrypted(projKey)) ?? (await loadDecrypted(globalKey));
+        const v =
+          (await loadDecrypted(projKey)) ?? (await loadDecrypted(globalKey));
         if (v) setter(v);
       }
-      const def = (await loadDecrypted(nsKey(pid, "sec_default_branch"))) ?? "main";
+      const def =
+        (await loadDecrypted(nsKey(pid, "sec_default_branch"))) ?? "main";
       setDefaultBranch(def);
       setCiBranch(def);
       setUserRepoBranch(def);
@@ -88,25 +116,66 @@ export function DeployPanel() {
       setVercelHelp(false);
       setHideDistBanner(false);
     };
-    window.addEventListener("bf:reset-ui-tips", onReset as EventListener);
-    return () => window.removeEventListener("bf:reset-ui-tips", onReset as EventListener);
+    window.addEventListener(
+      "bf:reset-ui-tips",
+      onReset as unknown as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "bf:reset-ui-tips",
+        onReset as unknown as EventListener,
+      );
   }, []);
 
   // Save per-project
-  React.useEffect(() => { if (netlifyToken) saveEncrypted(nsKey(pid, "sec_netlify_token"), netlifyToken); }, [netlifyToken, pid]);
-  React.useEffect(() => { if (netlifySiteId) saveEncrypted(nsKey(pid, "sec_netlify_site"), netlifySiteId); }, [netlifySiteId, pid]);
-  React.useEffect(() => { if (vercelToken) saveEncrypted(nsKey(pid, "sec_vercel_token"), vercelToken); }, [vercelToken, pid]);
-  React.useEffect(() => { if (vercelProject) saveEncrypted(nsKey(pid, "sec_vercel_project"), vercelProject); }, [vercelProject, pid]);
-  React.useEffect(() => { if (vercelFramework) saveEncrypted(nsKey(pid, "sec_vercel_framework"), vercelFramework); }, [vercelFramework, pid]);
-  React.useEffect(() => { if (vercelBuildCmd) saveEncrypted(nsKey(pid, "sec_vercel_build_cmd"), vercelBuildCmd); }, [vercelBuildCmd, pid]);
-  React.useEffect(() => { if (vercelOutDir) saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir); }, [vercelOutDir, pid]);
-  React.useEffect(() => { if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo); }, [ghRepo, pid]);
-  React.useEffect(() => { if (defaultBranch) saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch); }, [defaultBranch, pid]);
-  React.useEffect(() => { if (statusWorkerUrl) saveEncrypted(nsKey(pid, "sec_status_worker_url"), statusWorkerUrl); }, [statusWorkerUrl, pid]);
+  React.useEffect(() => {
+    if (netlifyToken)
+      saveEncrypted(nsKey(pid, "sec_netlify_token"), netlifyToken);
+  }, [netlifyToken, pid]);
+  React.useEffect(() => {
+    if (netlifySiteId)
+      saveEncrypted(nsKey(pid, "sec_netlify_site"), netlifySiteId);
+  }, [netlifySiteId, pid]);
+  React.useEffect(() => {
+    if (vercelToken) saveEncrypted(nsKey(pid, "sec_vercel_token"), vercelToken);
+  }, [vercelToken, pid]);
+  React.useEffect(() => {
+    if (vercelProject)
+      saveEncrypted(nsKey(pid, "sec_vercel_project"), vercelProject);
+  }, [vercelProject, pid]);
+  React.useEffect(() => {
+    if (vercelFramework)
+      saveEncrypted(nsKey(pid, "sec_vercel_framework"), vercelFramework);
+  }, [vercelFramework, pid]);
+  React.useEffect(() => {
+    if (vercelBuildCmd)
+      saveEncrypted(nsKey(pid, "sec_vercel_build_cmd"), vercelBuildCmd);
+  }, [vercelBuildCmd, pid]);
+  React.useEffect(() => {
+    if (vercelOutDir)
+      saveEncrypted(nsKey(pid, "sec_vercel_out_dir"), vercelOutDir);
+  }, [vercelOutDir, pid]);
+  React.useEffect(() => {
+    if (ghRepo) saveEncrypted(nsKey(pid, "sec_github_pages_repo"), ghRepo);
+  }, [ghRepo, pid]);
+  React.useEffect(() => {
+    if (defaultBranch)
+      saveEncrypted(nsKey(pid, "sec_default_branch"), defaultBranch);
+  }, [defaultBranch, pid]);
+  React.useEffect(() => {
+    if (statusWorkerUrl)
+      saveEncrypted(nsKey(pid, "sec_status_worker_url"), statusWorkerUrl);
+  }, [statusWorkerUrl, pid]);
   // Persist UI prefs
-  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_gh"), ghHelp ? "1" : "0"); }, [ghHelp, pid]);
-  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_netlify"), netlifyHelp ? "1" : "0"); }, [netlifyHelp, pid]);
-  React.useEffect(() => { saveEncrypted(nsKey(pid, "sec_help_vercel"), vercelHelp ? "1" : "0"); }, [vercelHelp, pid]);
+  React.useEffect(() => {
+    saveEncrypted(nsKey(pid, "sec_help_gh"), ghHelp ? "1" : "0");
+  }, [ghHelp, pid]);
+  React.useEffect(() => {
+    saveEncrypted(nsKey(pid, "sec_help_netlify"), netlifyHelp ? "1" : "0");
+  }, [netlifyHelp, pid]);
+  React.useEffect(() => {
+    saveEncrypted(nsKey(pid, "sec_help_vercel"), vercelHelp ? "1" : "0");
+  }, [vercelHelp, pid]);
 
   const distMissing = React.useMemo(() => {
     if (!current || !useDist || hideDistBanner) return false;
@@ -146,18 +215,33 @@ export function DeployPanel() {
       const path = f.path;
       // Create/update file in gh-pages branch
       let sha: string | undefined;
-      const head = await fetch(`${apiBase}/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-      });
+      const head = await fetch(
+        `${apiBase}/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+          },
+        },
+      );
       if (head.ok) {
         const j = await head.json().catch(() => null);
         sha = j?.sha;
       }
       const content = btoa(unescape(encodeURIComponent(f.contents)));
-      const body = { message: `Deploy ${path} via BoltForge`, content, branch, sha };
+      const body = {
+        message: `Deploy ${path} via BoltForge`,
+        content,
+        branch,
+        sha,
+      };
       const put = await fetch(`${apiBase}/${encodeURIComponent(path)}`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(body),
       });
       if (!put.ok) {
@@ -172,14 +256,22 @@ export function DeployPanel() {
     // Create .nojekyll to avoid Jekyll processing
     const nj = await fetch(`${apiBase}/.nojekyll`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "Disable Jekyll", content: btoa(""), branch }),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: "Disable Jekyll",
+        content: btoa(""),
+        branch,
+      }),
     });
     if (nj.ok) log("Created .nojekyll");
     setStatus(`Deployed to GitHub Pages on branch ${branch}`);
   };
 
-  const zipCurrent = async (): Promise<Blob | null> => {
+  const _zipCurrent = async (): Promise<Blob | null> => {
     if (!current) return null;
     const zip = new JSZip();
     const files = filesForDeploy();
@@ -199,32 +291,49 @@ export function DeployPanel() {
     const files = filesForDeploy();
     const pathToSha: Record<string, string> = {};
     for (const f of files) {
-      pathToSha[`/${f.path}`] = await (await import("../../lib/deploy/util")).sha1Hex(f.contents);
+      pathToSha[`/${f.path}`] = await (
+        await import("../../lib/deploy/util")
+      ).sha1Hex(f.contents);
     }
     // 1) Create deploy with files map
-    const createResp = await fetch(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(netlifySiteId)}/deploys`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${netlifyToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ files: pathToSha }),
-    });
+    const createResp = await fetch(
+      `https://api.netlify.com/api/v1/sites/${encodeURIComponent(netlifySiteId)}/deploys`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${netlifyToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ files: pathToSha }),
+      },
+    );
     const create = await createResp.json().catch(() => ({}));
     if (!createResp.ok) {
-      log(`Netlify create failed: ${createResp.status} ${JSON.stringify(create).slice(0, 200)}`);
+      log(
+        `Netlify create failed: ${createResp.status} ${JSON.stringify(create).slice(0, 200)}`,
+      );
       setStatus("Netlify deploy failed");
       return;
     }
     log(`Netlify deploy id: ${create.id}`);
     // 2) Upload required files
-    const required: string[] = Array.isArray(create.required) ? create.required : [];
+    const required: string[] = Array.isArray(create.required)
+      ? create.required
+      : [];
     for (const req of required) {
       const rel = req.startsWith("/") ? req : `/${req}`;
       const local = files.find((f) => `/${f.path}` === rel);
       if (!local) continue;
-      const put = await fetch(create.upload_urls ? create.upload_urls[req] : `${create.deploy_uploads_url}${rel}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${netlifyToken}` },
-        body: new Blob([local.contents]),
-      });
+      const put = await fetch(
+        create.upload_urls
+          ? create.upload_urls[req]
+          : `${create.deploy_uploads_url}${rel}`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${netlifyToken}` },
+          body: new Blob([local.contents]),
+        },
+      );
       if (!put.ok) {
         log(`Netlify upload failed for ${rel}: ${put.status}`);
         setStatus("Netlify deploy failed");
@@ -236,8 +345,12 @@ export function DeployPanel() {
     // 3) Poll deploy status
     if (create.id) {
       setStatus("Netlify deploy uploaded, polling status...");
-      const pollUrl = statusWorkerUrl ? `${statusWorkerUrl}/status/netlify?id=${encodeURIComponent(create.id)}` : `https://api.netlify.com/api/v1/deploys/${encodeURIComponent(create.id)}`;
-      const pollHeaders = statusWorkerUrl ? { Authorization: `Bearer ${netlifyToken}` } : { Authorization: `Bearer ${netlifyToken}` };
+      const pollUrl = statusWorkerUrl
+        ? `${statusWorkerUrl}/status/netlify?id=${encodeURIComponent(create.id)}`
+        : `https://api.netlify.com/api/v1/deploys/${encodeURIComponent(create.id)}`;
+      const pollHeaders = statusWorkerUrl
+        ? { Authorization: `Bearer ${netlifyToken}` }
+        : { Authorization: `Bearer ${netlifyToken}` };
       let attempts = 0;
       const maxAttempts = 20;
       const interval = 3000;
@@ -275,13 +388,19 @@ export function DeployPanel() {
     }
 
     // Ensure project exists and has proper framework/build settings
-    const projResp = await fetch(`https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProject)}`, {
-      headers: { Authorization: `Bearer ${vercelToken}` },
-    });
+    const projResp = await fetch(
+      `https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProject)}`,
+      {
+        headers: { Authorization: `Bearer ${vercelToken}` },
+      },
+    );
     if (projResp.status === 404) {
       const create = await fetch("https://api.vercel.com/v9/projects", {
         method: "POST",
-        headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           name: vercelProject,
           framework: vercelFramework,
@@ -297,15 +416,21 @@ export function DeployPanel() {
       }
     } else if (projResp.ok) {
       // Patch settings
-      await fetch(`https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProject)}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          framework: vercelFramework,
-          buildCommand: vercelBuildCmd,
-          outputDirectory: vercelOutDir,
-        }),
-      }).catch(() => {});
+      await fetch(
+        `https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProject)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${vercelToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            framework: vercelFramework,
+            buildCommand: vercelBuildCmd,
+            outputDirectory: vercelOutDir,
+          }),
+        },
+      ).catch(() => {});
     } else {
       setStatus(`Vercel error: ${projResp.status}`);
       return;
@@ -314,7 +439,10 @@ export function DeployPanel() {
     // Kick off a deployment linking to the project
     const depResp = await fetch("https://api.vercel.com/v13/deployments", {
       method: "POST",
-      headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${vercelToken}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         name: vercelProject,
         target: "production",
@@ -330,8 +458,12 @@ export function DeployPanel() {
     }
     setStatus("Vercel deployment request sent, polling status...");
     if (depId) {
-      const pollUrl = statusWorkerUrl ? `${statusWorkerUrl}/status/vercel?id=${encodeURIComponent(depId)}` : `https://api.vercel.com/v13/deployments/${encodeURIComponent(depId)}`;
-      const pollHeaders: Record<string, string> = { Authorization: `Bearer ${vercelToken}` };
+      const pollUrl = statusWorkerUrl
+        ? `${statusWorkerUrl}/status/vercel?id=${encodeURIComponent(depId)}`
+        : `https://api.vercel.com/v13/deployments/${encodeURIComponent(depId)}`;
+      const pollHeaders: Record<string, string> = {
+        Authorization: `Bearer ${vercelToken}`,
+      };
       if (!statusWorkerUrl) {
         pollHeaders["Content-Type"] = "application/json";
       }
@@ -363,13 +495,20 @@ export function DeployPanel() {
 
   return (
     <div className="space-y-2 text-sm">
-      
       <div className="flex items-center gap-3">
         <label className="text-xs flex items-center gap-1">
-          <input type="checkbox" checked={useDist} onChange={(e) => setUseDist(e.currentTarget.checked)} aria-label="Use dist/ folder if present" />
+          <input
+            type="checkbox"
+            checked={useDist}
+            onChange={(e) => setUseDist(e.currentTarget.checked)}
+            aria-label="Use dist/ folder if present"
+          />
           Use dist/ if present
         </label>
-        <label className="text-xs flex items-center gap-1" title="Default branch used for generated workflows">
+        <label
+          className="text-xs flex items-center gap-1"
+          title="Default branch used for generated workflows"
+        >
           <span>Default branch</span>
           <input
             className="h-7 rounded-md border border-input px-2 text-xs"
@@ -383,7 +522,10 @@ export function DeployPanel() {
             aria-label="Default branch"
           />
         </label>
-        <label className="text-xs flex items-center gap-1" title="Optional: Cloudflare Worker URL for status polling">
+        <label
+          className="text-xs flex items-center gap-1"
+          title="Optional: Cloudflare Worker URL for status polling"
+        >
           <span>Status Worker</span>
           <input
             className="h-7 rounded-md border border-input px-2 text-xs"
@@ -395,13 +537,23 @@ export function DeployPanel() {
         </label>
       </div>
       {distMissing && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2 text-xs" role="status" aria-live="polite">
+        <div
+          className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2 text-xs"
+          role="status"
+          aria-live="polite"
+        >
           <div className="flex items-start justify-between gap-2">
             <div>
               No dist/ files detected. You can:
               <ul className="list-disc list-inside">
-                <li>Uncheck “Use dist/ if present” to deploy current project files, or</li>
-                <li>Generate a CI workflow below to build and publish dist/ automatically.</li>
+                <li>
+                  Uncheck “Use dist/ if present” to deploy current project
+                  files, or
+                </li>
+                <li>
+                  Generate a CI workflow below to build and publish dist/
+                  automatically.
+                </li>
               </ul>
             </div>
             <button
@@ -422,7 +574,14 @@ export function DeployPanel() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="font-medium">GitHub Pages</div>
-            <Button variant="ghost" size="sm" onClick={() => setGhHelp((v) => !v)} aria-label="GitHub Pages help">?</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setGhHelp((v) => !v)}
+              aria-label="GitHub Pages help"
+            >
+              ?
+            </Button>
           </div>
           {ghHelp && (
             <div className="text-xs text-muted-foreground">
@@ -431,7 +590,10 @@ export function DeployPanel() {
                 <li>Sign in via Git (top of Git panel) if you haven't.</li>
                 <li>Click Deploy to upload files to gh-pages branch.</li>
                 <li>Enable Pages in repo settings for gh-pages branch.</li>
-                <li>Optional: Download a CI workflow to build dist/ and publish automatically.</li>
+                <li>
+                  Optional: Download a CI workflow to build dist/ and publish
+                  automatically.
+                </li>
               </ol>
             </div>
           )}
@@ -443,7 +605,12 @@ export function DeployPanel() {
             onChange={(e) => setGhRepo(e.currentTarget.value)}
           />
           <div className="flex gap-2 items-center">
-            <Button variant="secondary" onClick={deployGitHubPages} aria-label="Deploy to GitHub Pages" title="Uploads current files (or dist/) to gh-pages branch">
+            <Button
+              variant="secondary"
+              onClick={deployGitHubPages}
+              aria-label="Deploy to GitHub Pages"
+              title="Uploads current files (or dist/) to gh-pages branch"
+            >
               Deploy
             </Button>
             <input
@@ -457,16 +624,18 @@ export function DeployPanel() {
             <Button
               variant="ghost"
               onClick={() => {
-                import("../../lib/deploy/workflows").then(({ generateGhPagesWorkflow }) => {
-                  const content = generateGhPagesWorkflow(ciBranch);
-                  const blob = new Blob([content], { type: "text/yaml" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "gh-pages.yml";
-                  a.click();
-                  URL.revokeObjectURL(url);
-                });
+                import("../../lib/deploy/workflows").then(
+                  ({ generateGhPagesWorkflow }) => {
+                    const content = generateGhPagesWorkflow(ciBranch);
+                    const blob = new Blob([content], { type: "text/yaml" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "gh-pages.yml";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  },
+                );
               }}
               aria-label="Download GitHub Pages workflow"
               title="Download GitHub Pages workflow (add to .github/workflows)"
@@ -478,15 +647,30 @@ export function DeployPanel() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="font-medium">Netlify</div>
-            <Button variant="ghost" size="sm" onClick={() => setNetlifyHelp((v) => !v)} aria-label="Netlify help">?</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setNetlifyHelp((v) => !v)}
+              aria-label="Netlify help"
+            >
+              ?
+            </Button>
           </div>
           {netlifyHelp && (
             <div className="text-xs text-muted-foreground">
               <ol className="list-decimal list-inside space-y-1">
                 <li>Create a Netlify Personal Access Token and Site ID.</li>
-                <li>Enter token and site ID here. Token requires deploy rights.</li>
-                <li>Click Deploy to create a hash-based deploy and upload required files only.</li>
-                <li>Use dist/ for faster deploys, or disable it to deploy current files.</li>
+                <li>
+                  Enter token and site ID here. Token requires deploy rights.
+                </li>
+                <li>
+                  Click Deploy to create a hash-based deploy and upload required
+                  files only.
+                </li>
+                <li>
+                  Use dist/ for faster deploys, or disable it to deploy current
+                  files.
+                </li>
               </ol>
             </div>
           )}
@@ -504,21 +688,38 @@ export function DeployPanel() {
             value={netlifySiteId}
             onChange={(e) => setNetlifySiteId(e.currentTarget.value)}
           />
-          <Button variant="secondary" onClick={deployNetlify} aria-label="Deploy to Netlify" title="Creates a hash-based deploy and uploads only required files">
+          <Button
+            variant="secondary"
+            onClick={deployNetlify}
+            aria-label="Deploy to Netlify"
+            title="Creates a hash-based deploy and uploads only required files"
+          >
             Deploy
           </Button>
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="font-medium">Vercel</div>
-            <Button variant="ghost" size="sm" onClick={() => setVercelHelp((v) => !v)} aria-label="Vercel help">?</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setVercelHelp((v) => !v)}
+              aria-label="Vercel help"
+            >
+              ?
+            </Button>
           </div>
           {vercelHelp && (
             <div className="text-xs text-muted-foreground">
               <ol className="list-decimal list-inside space-y-1">
                 <li>Create a Vercel token and a project name.</li>
-                <li>Optionally set framework, build command, and output directory.</li>
-                <li>Click Deploy to create/patch the project and trigger a deployment.</li>
+                <li>
+                  Optionally set framework, build command, and output directory.
+                </li>
+                <li>
+                  Click Deploy to create/patch the project and trigger a
+                  deployment.
+                </li>
                 <li>Use CI to build dist/ if you don’t commit built assets.</li>
               </ol>
             </div>
@@ -560,7 +761,12 @@ export function DeployPanel() {
               onChange={(e) => setVercelOutDir(e.currentTarget.value)}
             />
           </div>
-          <Button variant="secondary" onClick={deployVercel} aria-label="Deploy to Vercel" title="Links project/config then requests a deployment">
+          <Button
+            variant="secondary"
+            onClick={deployVercel}
+            aria-label="Deploy to Vercel"
+            title="Links project/config then requests a deployment"
+          >
             Deploy
           </Button>
         </div>
@@ -568,7 +774,11 @@ export function DeployPanel() {
       <div className="rounded-md border p-2">
         <div className="font-medium">Status</div>
         <div aria-live="polite">{status}</div>
-        {target && <div className="text-xs text-muted-foreground mt-1">Target: {target}</div>}
+        {target && (
+          <div className="text-xs text-muted-foreground mt-1">
+            Target: {target}
+          </div>
+        )}
         <div className="mt-2 text-xs max-h-40 overflow-auto">
           {logs.map((l, i) => (
             <div key={i}>{l}</div>
@@ -611,7 +821,11 @@ export function DeployPanel() {
               variant="ghost"
               title="Add vercel.json rewrites to index.html"
               onClick={async () => {
-                const vercelJson = JSON.stringify({ rewrites: [{ source: "/(.*)", destination: "/" }] }, null, 2);
+                const vercelJson = JSON.stringify(
+                  { rewrites: [{ source: "/(.*)", destination: "/" }] },
+                  null,
+                  2,
+                );
                 await upsertFile("vercel.json", vercelJson);
                 setStatus("Added vercel.json SPA rewrites");
               }}
@@ -620,7 +834,8 @@ export function DeployPanel() {
             </Button>
           </div>
           <div className="text-xs text-muted-foreground">
-            These helpers ensure client-side routers work in production by serving index.html for all routes.
+            These helpers ensure client-side routers work in production by
+            serving index.html for all routes.
           </div>
         </div>
 
@@ -638,16 +853,18 @@ export function DeployPanel() {
             <Button
               variant="ghost"
               onClick={() => {
-                import("../../lib/deploy/workflows").then(({ generateUserGhPagesWorkflow }) => {
-                  const content = generateUserGhPagesWorkflow(userRepoBranch);
-                  const blob = new Blob([content], { type: "text/yaml" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "user-gh-pages.yml";
-                  a.click();
-                  URL.revokeObjectURL(url);
-                });
+                import("../../lib/deploy/workflows").then(
+                  ({ generateUserGhPagesWorkflow }) => {
+                    const content = generateUserGhPagesWorkflow(userRepoBranch);
+                    const blob = new Blob([content], { type: "text/yaml" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "user-gh-pages.yml";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  },
+                );
               }}
               aria-label="Download user GH Pages workflow"
               title="Download user GH Pages workflow (add to .github/workflows)"
@@ -659,12 +876,24 @@ export function DeployPanel() {
         <div className="mt-4 space-y-2">
           <div className="font-medium">Stored Credentials (encrypted)</div>
           <ul className="text-xs space-y-1">
-            <li title="Saved for this project only">Netlify token: {netlifyToken ? "stored" : "not set"}</li>
-            <li title="Saved for this project only">Netlify site id: {netlifySiteId ? "stored" : "not set"}</li>
-            <li title="Saved for this project only">Vercel token: {vercelToken ? "stored" : "not set"}</li>
-            <li title="Saved for this project only">Vercel project: {vercelProject ? "stored" : "not set"}</li>
-            <li title="Saved for this project only">GH Pages repo: {ghRepo ? "stored" : "not set"}</li>
-            <li title="Saved for this project only">Default branch: {defaultBranch || "main"}</li>
+            <li title="Saved for this project only">
+              Netlify token: {netlifyToken ? "stored" : "not set"}
+            </li>
+            <li title="Saved for this project only">
+              Netlify site id: {netlifySiteId ? "stored" : "not set"}
+            </li>
+            <li title="Saved for this project only">
+              Vercel token: {vercelToken ? "stored" : "not set"}
+            </li>
+            <li title="Saved for this project only">
+              Vercel project: {vercelProject ? "stored" : "not set"}
+            </li>
+            <li title="Saved for this project only">
+              GH Pages repo: {ghRepo ? "stored" : "not set"}
+            </li>
+            <li title="Saved for this project only">
+              Default branch: {defaultBranch || "main"}
+            </li>
           </ul>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -747,8 +976,15 @@ export function DeployPanel() {
               Reset UI Tips (Project)
             </Button>
           </div>
-          <div className="text-xs text-muted-foreground mt-2" title="How to use the workflows">
-            Tip: Add the downloaded YAML file to your repo under .github/workflows/, commit, and push. GitHub will run the workflow on pushes to the specified branch. Ensure your project builds to dist/ (or adjust publish_dir/output). For GitHub Pages, enable Pages in repo settings if needed.
+          <div
+            className="text-xs text-muted-foreground mt-2"
+            title="How to use the workflows"
+          >
+            Tip: Add the downloaded YAML file to your repo under
+            .github/workflows/, commit, and push. GitHub will run the workflow
+            on pushes to the specified branch. Ensure your project builds to
+            dist/ (or adjust publish_dir/output). For GitHub Pages, enable Pages
+            in repo settings if needed.
           </div>
         </div>
       </div>

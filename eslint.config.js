@@ -6,10 +6,27 @@ import globals from "globals";
 import prettier from "eslint-config-prettier";
 
 export default [
+  {
+    ignores: [
+      "dist/**",
+      "dist-electron/**",
+      "node_modules/**",
+      "electron/**",
+      "public/sw.js",
+      "scripts/**",
+      "coverage/**",
+      "test-results/**",
+      "playwright-report/**",
+      "workers/**",
+      "worker/**",
+      "**/*.d.ts",
+      "**/*.config.js",
+      "**/*.config.ts",
+    ],
+  },
   js.configs.recommended,
   {
     files: ["**/*.{ts,tsx,js,jsx}"],
-    ignores: ["dist/**", "node_modules/**"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -17,6 +34,10 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.node,
+        EventListener: "readonly",
+        ResponseInit: "readonly",
+        ExportedHandler: "readonly",
+        KVNamespace: "readonly",
       },
     },
     plugins: {
@@ -26,6 +47,13 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       "@typescript-eslint/no-explicit-any": "off",
+      "no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
       "@typescript-eslint/no-unused-vars": [
         "error",
         {

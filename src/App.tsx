@@ -3,11 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Separator } from "./components/ui/separator";
 import { Button } from "./components/ui/button";
 import { ProviderManager } from "./features/providers/ProviderManager";
-import Editor, { DiffEditor } from "@monaco-editor/react";
+import {
+  LazyEditor as Editor,
+  LazyDiffEditor as DiffEditor,
+} from "./components/editor/LazyMonaco";
 import { useProjectStore } from "./lib/store/projectStore";
 import { languageFromPath } from "./lib/editor/lang";
 import { useDebounced } from "./lib/hooks/useDebounced";
 import { SplitPane } from "./components/layout/SplitPane";
+import {
+  estimateUsage,
+  formatTokens,
+  formatCost,
+} from "./lib/tokens/estimator";
+import { getTruncationInfo } from "./lib/perf/limits";
 
 function Header() {
   const { current } = useProjectStore();
@@ -88,6 +97,14 @@ function EditorPanel() {
   );
   const debouncedCode = useDebounced(code, 150);
   const lang = languageFromPath(currentFilePath);
+
+  // Performance check for large files
+  const perfWarning = React.useMemo(() => {
+    if (!file) return null;
+    const size = new Blob([file.contents]).size;
+    const info = getTruncationInfo(size);
+    return info.shouldTruncate ? info.message : null;
+  }, [file]);
   const [formatOnSave, setFormatOnSave] = React.useState<boolean>(
     () => localStorage.getItem("bf_format_on_save") === "1",
   );
@@ -253,6 +270,11 @@ function EditorPanel() {
         </div>
       </CardHeader>
       <CardContent className="p-0 grow min-h-[200px]">
+        {perfWarning && (
+          <div className="px-3 py-2 text-xs bg-amber-50 text-amber-900 border-b border-amber-200">
+            ⚠️ {perfWarning}
+          </div>
+        )}
         <Editor
           height="100%"
           defaultLanguage={lang}
@@ -585,10 +607,54 @@ function ChatPanel() {
     );
   }
 
+  // Calculate token/cost estimation for current conversation
+  const usageEstimate = React.useMemo(() => {
+    const bundle = registry?.[providerId];
+    if (!bundle) return null;
+
+    const selectedModel = bundle.def.models?.find((m) => m.id === model);
+    if (!selectedModel) return null;
+
+    const messages = buildMessages();
+    messages.push({ role: "user", content: prompt });
+    if (output) {
+      messages.push({ role: "assistant", content: output });
+    }
+
+    return estimateUsage(messages, selectedModel);
+  }, [
+    registry,
+    providerId,
+    model,
+    prompt,
+    output,
+    currentFileContent,
+    attachments,
+    useContextFile,
+    currentFilePath,
+    targetPath,
+  ]);  
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="justify-between">
-        <CardTitle>Chat</CardTitle>
+        <div className="flex items-center justify-between w-full">
+          <CardTitle>Chat</CardTitle>
+          {usageEstimate && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span title="Estimated tokens">
+                {formatTokens(usageEstimate.totalTokens)} tokens
+              </span>
+              <Separator orientation="vertical" className="h-4" />
+              <span
+                title="Estimated cost"
+                className="font-medium text-foreground"
+              >
+                {formatCost(usageEstimate.estimatedCost)}
+              </span>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="grow flex flex-col gap-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
@@ -949,6 +1015,9 @@ function PreviewPanel() {
   const { append } = useTerminalStore();
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
+  // Debounce preview updates to avoid excessive reloads during rapid file changes
+  const debouncedPreviewHtml = useDebounced(previewHtml, 300);
+
   React.useEffect(() => {
     const onMessage = (ev: MessageEvent) => {
       const data = ev.data as any;
@@ -968,7 +1037,7 @@ function PreviewPanel() {
       iframeRef.current?.contentWindow?.postMessage({ __bf_ping: true }, "*");
     }, 300);
     return () => clearTimeout(t);
-  }, [previewHtml]);
+  }, [debouncedPreviewHtml]);
 
   return (
     <Card className="h-full flex flex-col">
@@ -982,7 +1051,7 @@ function PreviewPanel() {
           className="w-full h-full"
           sandbox="allow-scripts allow-downloads"
           referrerPolicy="no-referrer"
-          srcDoc={previewHtml}
+          srcDoc={debouncedPreviewHtml}
         />
       </CardContent>
     </Card>
@@ -1104,16 +1173,29 @@ function QuickActions() {
 import { FileTree } from "./features/files/FileTree";
 import { useTerminalStore } from "./lib/store/terminalStore";
 import { SnapshotList } from "./features/snapshots/SnapshotList";
-import {
-  CommandPalette,
-  useCommandPalette,
-} from "./features/commands/CommandPalette";
+import { CommandPalette, useCommandPalette } from "./features/commands";
 import { GitPanel } from "./features/git/GitPanel";
 import { DeployPanel } from "./features/deploy/DeployPanel";
 import { TemplatesGallery } from "./features/templates/TemplatesGallery";
+import { ComponentShowcase } from "./components/examples/ComponentShowcase";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./components/ui/dialog";
+import { RelayConfigPanel } from "./features/relay/RelayConfig";
 
 export default function App() {
   const { open, setOpen } = useCommandPalette();
+  const [showcaseOpen, setShowcaseOpen] = React.useState(false);
+
+  // Listen for showcase command
+  React.useEffect(() => {
+    const handler = () => setShowcaseOpen(true);
+    window.addEventListener("bf:open-showcase", handler);
+    return () => window.removeEventListener("bf:open-showcase", handler);
+  }, []);
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
@@ -1168,6 +1250,12 @@ export default function App() {
             </CardContent>
           </Card>
         </section>
+        <section
+          aria-label="Advanced Settings"
+          className="grid grid-cols-1 gap-4 mb-4"
+        >
+          <RelayConfigPanel />
+        </section>
         <section aria-label="Workbench" className="h-[70vh]">
           <SplitPane
             dir="vertical"
@@ -1205,6 +1293,14 @@ export default function App() {
         </section>
       </main>
       <CommandPalette open={open} onClose={() => setOpen(false)} />
+      <Dialog open={showcaseOpen} onOpenChange={setShowcaseOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>UI Component Showcase</DialogTitle>
+          </DialogHeader>
+          <ComponentShowcase />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useProjectStore } from "../lib/store/projectStore";
 describe("projectStore diffs and snapshots", () => {
   beforeEach(() => {
     // Reset store
-    const s = useProjectStore.getState();
+    const _s = useProjectStore.getState();
     useProjectStore.setState({
       current: undefined,
       projects: [],
@@ -29,19 +29,28 @@ describe("projectStore diffs and snapshots", () => {
     expect(useProjectStore.getState().staged?.op).toBe("modify");
     await useProjectStore.getState().approveDiff();
     const cur = useProjectStore.getState().current!;
-    expect(cur.files.find((f) => f.path === "index.html")?.contents).toBe("<p>b</p>");
+    expect(cur.files.find((f) => f.path === "index.html")?.contents).toBe(
+      "<p>b</p>",
+    );
 
     // add diff
     useProjectStore.getState().stageDiff("new.js", "console.log(1)");
     expect(useProjectStore.getState().staged?.op).toBe("add");
     await useProjectStore.getState().approveDiff();
-    expect(useProjectStore.getState().current!.files.find((f) => f.path === "new.js")?.contents).toBe("console.log(1)");
+    expect(
+      useProjectStore.getState().current!.files.find((f) => f.path === "new.js")
+        ?.contents,
+    ).toBe("console.log(1)");
 
     // delete diff
     useProjectStore.getState().stageDiff("new.js"); // undefined after -> delete
     expect(useProjectStore.getState().staged?.op).toBe("delete");
     await useProjectStore.getState().approveDiff();
-    expect(useProjectStore.getState().current!.files.find((f) => f.path === "new.js")).toBeUndefined();
+    expect(
+      useProjectStore
+        .getState()
+        .current!.files.find((f) => f.path === "new.js"),
+    ).toBeUndefined();
   });
 
   it("snapshot restore replaces files; selective apply via stageDiff", async () => {

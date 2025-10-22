@@ -1,0 +1,22 @@
+name = "boltforge-llm-relay"
+main = "worker/llm-relay.ts"
+compatibility_date = "2024-01-01"
+
+# Optional: Deploy to custom domain
+# routes = [
+#   { pattern = "relay.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+# KV namespace for rate limiting
+[[kv_namespaces]]
+binding = "RATE_LIMITER"
+id = "your_kv_namespace_id" # Replace with actual KV namespace ID after creating it
+
+# To create the KV namespace:
+# wrangler kv:namespace create "RATE_LIMITER"
+# Then update the 'id' above with the returned namespace ID
+
+# To deploy:
+# npm install -g wrangler  (if not already installed)
+# wrangler login
+# wrangler deploy

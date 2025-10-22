@@ -5,7 +5,7 @@ type Dir = "vertical" | "horizontal";
 type Props = {
   dir?: Dir; // vertical => left/right, horizontal => top/bottom
   sizes: number[]; // percentages that sum to ~100
-  onSizesChange?: (sizes: number[]) => void;
+  onSizesChange?: (sizes: number[]) => void; // eslint-disable-line no-unused-vars
   storageKey?: string;
   children: React.ReactNode[];
   minSizePct?: number; // minimal percentage for any pane
@@ -25,9 +25,12 @@ export function SplitPane({
         const raw = localStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length === sizes.length) return parsed;
+          if (Array.isArray(parsed) && parsed.length === sizes.length)
+            return parsed;
         }
-      } catch {}
+      } catch {
+        // Ignore parse errors
+      }
     }
     return sizes;
   });
@@ -43,12 +46,23 @@ export function SplitPane({
   React.useEffect(() => {
     const onReset = (e: Event) => {
       const ce = e as CustomEvent<{ key: string; sizes: number[] }>;
-      if (storageKey && ce.detail?.key === storageKey && Array.isArray(ce.detail.sizes)) {
+      if (
+        storageKey &&
+        ce.detail?.key === storageKey &&
+        Array.isArray(ce.detail.sizes)
+      ) {
         setLocalSizes(ce.detail.sizes);
       }
     };
-    window.addEventListener("bf:split-reset", onReset as EventListener);
-    return () => window.removeEventListener("bf:split-reset", onReset as EventListener);
+    window.addEventListener(
+      "bf:split-reset",
+      onReset as unknown as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "bf:split-reset",
+        onReset as unknown as EventListener,
+      );
   }, [storageKey]);
 
   const isVertical = dir === "vertical";
@@ -87,9 +101,12 @@ export function SplitPane({
     const next = [...startSizesRef.current];
     let a = Math.max(minSizePct, next[i] + deltaPct);
     let b = Math.max(minSizePct, next[i + 1] - deltaPct);
-    const rest = next.reduce((sum, v, idx) => (idx === i || idx === i + 1 ? sum : sum + v), 0);
+    const rest = next.reduce(
+      (sum, v, idx) => (idx === i || idx === i + 1 ? sum : sum + v),
+      0,
+    );
     const remaining = Math.max(0, 100 - rest);
-    const scale = (a + b) > 0 ? remaining / (a + b) : 1;
+    const scale = a + b > 0 ? remaining / (a + b) : 1;
     a = a * scale;
     b = b * scale;
     next[i] = a;
@@ -135,7 +152,9 @@ export function SplitPane({
   const styleFor = (pct: number) =>
     isVertical ? { width: `${pct}%` } : { height: `${pct}%` };
 
-  const containerStyle = isVertical ? "flex flex-row w-full h-full" : "flex flex-col w-full h-full";
+  const containerStyle = isVertical
+    ? "flex flex-row w-full h-full"
+    : "flex flex-col w-full h-full";
   const handleStyle = isVertical
     ? "w-1 cursor-col-resize bg-border hover:bg-primary/30"
     : "h-1 cursor-row-resize bg-border hover:bg-primary/30";
@@ -143,10 +162,16 @@ export function SplitPane({
   const kids = React.Children.toArray(children);
 
   return (
-    <div ref={containerRef} className={containerStyle} aria-label="Split pane container">
+    <div
+      ref={containerRef}
+      className={containerStyle}
+      aria-label="Split pane container"
+    >
       {kids.map((child, idx) => (
         <React.Fragment key={idx}>
-          <div style={styleFor(localSizes[idx])} className="overflow-hidden">{child}</div>
+          <div style={styleFor(localSizes[idx])} className="overflow-hidden">
+            {child}
+          </div>
           {idx < kids.length - 1 && (
             <div
               role="separator"

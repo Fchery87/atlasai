@@ -1,0 +1,102 @@
+{
+  "appId": "com.boltforge.app",
+  "productName": "BoltForge",
+  "copyright": "Copyright © 2024 BoltForge",
+  "directories": {
+    "output": "dist-electron",
+    "buildResources": "electron-resources"
+  },
+  "files": ["dist/**/*", "electron/dist/**/*", "package.json"],
+  "extraMetadata": {
+    "main": "electron/dist/main.js"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/icons/icon-512x512.png",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "BoltForge"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "icon": "public/icons/icon-512x512.png",
+    "category": "public.app-category.developer-tools",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "electron/entitlements.mac.plist",
+    "entitlementsInherit": "electron/entitlements.mac.plist"
+  },
+  "dmg": {
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ],
+    "title": "BoltForge ${version}",
+    "window": {
+      "width": 540,
+      "height": 400
+    }
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "rpm",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "icon": "public/icons",
+    "category": "Development",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "desktop": {
+      "Name": "BoltForge",
+      "Comment": "AI-Powered Web Development",
+      "Categories": "Development;IDE;",
+      "Keywords": "development;code;ai;editor;"
+    }
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "yourusername",
+    "repo": "boltforge"
+  }
+}

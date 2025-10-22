@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import { v4 as uuidv4 } from "./uuid";
 import type { Project, FileEntry, Snapshot } from "../types";
 import { putProject, getProject, listProjects } from "../storage/indexeddb";
+import { announce, announcements } from "../a11y/screen-reader";
 
 type StagedDiff = {
   path: string;
@@ -148,6 +149,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       current: proj,
       previewHtml: buildPreviewHTML(proj),
     }));
+    announce(announcements.projectCreated(name));
   },
 
   async openProject(id) {
@@ -155,6 +157,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     if (!rec) throw new Error("Project not found");
     const proj = rec.data as Project;
     set({ current: proj, previewHtml: buildPreviewHTML(proj) });
+    announce(announcements.projectLoaded(proj.name));
   },
 
   async renameProject(id, name) {
@@ -194,6 +197,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       currentFilePath: path,
       previewHtml: buildPreviewHTML(updated),
     });
+    announce(announcements.fileCreated(path));
   },
 
   async renameFile(oldPath, newPath) {
@@ -213,6 +217,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
         state.currentFilePath === oldPath ? newPath : state.currentFilePath,
       previewHtml: buildPreviewHTML(updated),
     });
+    announce(announcements.fileRenamed(oldPath, newPath));
   },
 
   async upsertFile(path, contents) {
@@ -244,6 +249,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       currentFilePath:
         state.currentFilePath === path ? undefined : state.currentFilePath,
     });
+    announce(announcements.fileDeleted(path));
   },
 
   async snapshot(label) {
@@ -261,6 +267,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
     };
     await putProject({ id: updated.id, data: updated });
     set({ current: updated });
+    announce(announcements.snapshotCreated(label));
     return snap;
   },
 
@@ -292,6 +299,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
           ? "modify"
           : "add";
     set({ staged: { path, before, after: after ?? "", op } });
+    announce(announcements.diffStaged());
   },
 
   async approveDiff() {
@@ -312,6 +320,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
         redoStack: [],
         staged: undefined,
       });
+      announce(announcements.diffApproved());
     } finally {
       set({ fileLock: false });
     }
@@ -335,6 +344,7 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       undoStack: state.undoStack.slice(0, -1),
       redoStack: [...state.redoStack, la],
     });
+    announce(announcements.undoApplied());
   },
 
   async redoLastApply() {
@@ -350,10 +360,12 @@ export const useProjectStore = create<State & Actions>((set, get) => ({
       redoStack: state.redoStack.slice(0, -1),
       undoStack: [...state.undoStack, ra],
     });
+    announce(announcements.redoApplied());
   },
 
   rejectDiff() {
     set({ staged: undefined });
+    announce(announcements.diffRejected());
   },
 
   async exportZip() {

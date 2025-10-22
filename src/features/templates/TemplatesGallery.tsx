@@ -1,6 +1,11 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
 import { useProjectStore } from "../../lib/store/projectStore";
 
 type Template = {
@@ -189,8 +194,16 @@ const mdStatic: Template = {
   </body>
 </html>`,
     },
-    { path: "README.md", contents: "# Welcome\\n\\nThis is a simple Markdown site.\\n\\n```js\\nconsole.log('hello');\\n```" },
-    { path: "ABOUT.md", contents: "## About\\n\\nThis page is rendered from Markdown on the client." },
+    {
+      path: "README.md",
+      contents:
+        "# Welcome\\n\\nThis is a simple Markdown site.\\n\\n```js\\nconsole.log('hello');\\n```",
+    },
+    {
+      path: "ABOUT.md",
+      contents:
+        "## About\\n\\nThis page is rendered from Markdown on the client.",
+    },
   ],
 };
 
@@ -288,12 +301,360 @@ const blogStatic: Template = {
   </body>
 </html>`,
     },
-    { path: "posts/first.md", contents: "# First Post\\n\\nHello from the first post." },
-    { path: "posts/second.md", contents: "# Second Post\\n\\nAnother post content." },
+    {
+      path: "posts/first.md",
+      contents: "# First Post\\n\\nHello from the first post.",
+    },
+    {
+      path: "posts/second.md",
+      contents: "# Second Post\\n\\nAnother post content.",
+    },
   ],
 };
 
-const templates: Template[] = [vanillaHtml, spaRouter, tailwindCdn, mdStatic, tailwindDark, blogStatic];
+const todoApp: Template = {
+  id: "todo-app",
+  name: "Todo App (Vanilla JS)",
+  description: "Complete todo application with localStorage persistence.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Todo App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="p-6 max-w-2xl mx-auto font-sans">
+    <h1 class="text-3xl font-bold mb-4">My Todos</h1>
+    <div class="flex gap-2 mb-4">
+      <input id="input" type="text" placeholder="Add new todo..." class="flex-1 px-3 py-2 border rounded" />
+      <button onclick="addTodo()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+    </div>
+    <ul id="list" class="space-y-2"></ul>
+    <script>
+      let todos = JSON.parse(localStorage.getItem('todos') || '[]');
+      function save(){ localStorage.setItem('todos', JSON.stringify(todos)); }
+      function render(){
+        const list = document.getElementById('list');
+        list.innerHTML = todos.map((t, i) =>
+          '<li class="flex items-center gap-2 p-2 border rounded">' +
+          '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggle(' + i + ')" />' +
+          '<span class="flex-1 ' + (t.done ? 'line-through text-gray-500' : '') + '">' + escapeHtml(t.text) + '</span>' +
+          '<button onclick="del(' + i + ')" class="text-red-600 hover:text-red-800">Delete</button>' +
+          '</li>'
+        ).join('');
+      }
+      function addTodo(){
+        const input = document.getElementById('input');
+        if (!input.value.trim()) return;
+        todos.push({ text: input.value, done: false });
+        input.value = '';
+        save();
+        render();
+      }
+      function toggle(i){ todos[i].done = !todos[i].done; save(); render(); }
+      function del(i){ todos.splice(i, 1); save(); render(); }
+      function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+      document.getElementById('input').addEventListener('keypress', e => { if (e.key === 'Enter') addTodo(); });
+      render();
+    </script>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const dashboard: Template = {
+  id: "admin-dashboard",
+  name: "Admin Dashboard",
+  description: "Responsive admin dashboard with sidebar and data cards.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="flex h-screen">
+      <aside class="w-64 bg-gray-900 text-white p-4">
+        <h2 class="text-xl font-bold mb-4">Dashboard</h2>
+        <nav class="space-y-2">
+          <a href="#" class="block px-3 py-2 rounded bg-gray-800">Overview</a>
+          <a href="#" class="block px-3 py-2 rounded hover:bg-gray-800">Users</a>
+          <a href="#" class="block px-3 py-2 rounded hover:bg-gray-800">Analytics</a>
+          <a href="#" class="block px-3 py-2 rounded hover:bg-gray-800">Settings</a>
+        </nav>
+      </aside>
+      <main class="flex-1 p-6 overflow-auto">
+        <h1 class="text-2xl font-bold mb-6">Overview</h1>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white p-4 rounded shadow">
+            <div class="text-gray-500 text-sm">Total Users</div>
+            <div class="text-3xl font-bold">1,234</div>
+            <div class="text-green-500 text-sm">+12% from last month</div>
+          </div>
+          <div class="bg-white p-4 rounded shadow">
+            <div class="text-gray-500 text-sm">Revenue</div>
+            <div class="text-3xl font-bold">$56,789</div>
+            <div class="text-green-500 text-sm">+8% from last month</div>
+          </div>
+          <div class="bg-white p-4 rounded shadow">
+            <div class="text-gray-500 text-sm">Active Sessions</div>
+            <div class="text-3xl font-bold">567</div>
+            <div class="text-gray-500 text-sm">Current active</div>
+          </div>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h2 class="font-bold mb-4">Recent Activity</h2>
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr><th class="text-left p-2">User</th><th class="text-left p-2">Action</th><th class="text-left p-2">Time</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="p-2">John Doe</td><td class="p-2">Logged in</td><td class="p-2">2 minutes ago</td></tr>
+              <tr><td class="p-2">Jane Smith</td><td class="p-2">Updated profile</td><td class="p-2">15 minutes ago</td></tr>
+              <tr><td class="p-2">Bob Johnson</td><td class="p-2">Made purchase</td><td class="p-2">1 hour ago</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const landingPage: Template = {
+  id: "landing-page",
+  name: "Landing Page",
+  description: "Modern landing page with hero section and features.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Product Landing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="font-sans">
+    <header class="bg-white shadow-sm sticky top-0">
+      <nav class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div class="text-xl font-bold">ProductName</div>
+        <div class="space-x-4">
+          <a href="#features" class="hover:text-blue-600">Features</a>
+          <a href="#pricing" class="hover:text-blue-600">Pricing</a>
+          <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Sign Up</button>
+        </div>
+      </nav>
+    </header>
+    <section class="py-20 px-4 text-center bg-gradient-to-b from-blue-50 to-white">
+      <h1 class="text-5xl font-bold mb-4">Build Something Amazing</h1>
+      <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">The ultimate tool for modern developers. Fast, powerful, and easy to use.</p>
+      <button class="px-8 py-3 bg-blue-600 text-white rounded-lg text-lg hover:bg-blue-700">Get Started Free</button>
+    </section>
+    <section id="features" class="py-20 px-4 max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12">Features</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="text-center">
+          <div class="text-4xl mb-4">⚡</div>
+          <h3 class="font-bold mb-2">Lightning Fast</h3>
+          <p class="text-gray-600">Optimized performance for the best experience</p>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl mb-4">🔒</div>
+          <h3 class="font-bold mb-2">Secure</h3>
+          <p class="text-gray-600">Enterprise-grade security built-in</p>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl mb-4">🎨</div>
+          <h3 class="font-bold mb-2">Customizable</h3>
+          <p class="text-gray-600">Make it yours with endless options</p>
+        </div>
+      </div>
+    </section>
+    <footer class="bg-gray-900 text-white py-12 px-4 text-center">
+      <p>&copy; 2024 ProductName. All rights reserved.</p>
+    </footer>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const portfolio: Template = {
+  id: "portfolio",
+  name: "Portfolio Site",
+  description: "Personal portfolio with projects showcase.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="font-sans bg-gray-50">
+    <header class="bg-white shadow-sm">
+      <nav class="max-w-4xl mx-auto px-4 py-6">
+        <div class="text-2xl font-bold">John Doe</div>
+        <p class="text-gray-600">Full Stack Developer</p>
+      </nav>
+    </header>
+    <main class="max-w-4xl mx-auto px-4 py-12">
+      <section class="mb-16">
+        <h1 class="text-4xl font-bold mb-4">Hi, I'm John 👋</h1>
+        <p class="text-xl text-gray-600 mb-4">I build beautiful web applications with modern technologies.</p>
+        <div class="space-x-4">
+          <a href="https://github.com" class="text-blue-600 hover:underline">GitHub</a>
+          <a href="https://linkedin.com" class="text-blue-600 hover:underline">LinkedIn</a>
+          <a href="mailto:john@example.com" class="text-blue-600 hover:underline">Email</a>
+        </div>
+      </section>
+      <section class="mb-16">
+        <h2 class="text-2xl font-bold mb-6">Projects</h2>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="font-bold text-lg mb-2">Project One</h3>
+            <p class="text-gray-600 mb-4">A modern web application built with React and TypeScript.</p>
+            <div class="flex gap-2">
+              <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">React</span>
+              <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">TypeScript</span>
+            </div>
+          </div>
+          <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="font-bold text-lg mb-2">Project Two</h3>
+            <p class="text-gray-600 mb-4">E-commerce platform with full payment integration.</p>
+            <div class="flex gap-2">
+              <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Node.js</span>
+              <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">MongoDB</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h2 class="text-2xl font-bold mb-6">Skills</h2>
+        <div class="flex flex-wrap gap-2">
+          <span class="px-3 py-2 bg-white rounded shadow text-sm">JavaScript</span>
+          <span class="px-3 py-2 bg-white rounded shadow text-sm">TypeScript</span>
+          <span class="px-3 py-2 bg-white rounded shadow text-sm">React</span>
+          <span class="px-3 py-2 bg-white rounded shadow text-sm">Node.js</span>
+          <span class="px-3 py-2 bg-white rounded shadow text-sm">Python</span>
+          <span class="px-3 py-2 bg-white rounded shadow text-sm">SQL</span>
+        </div>
+      </section>
+    </main>
+    <footer class="bg-gray-900 text-white py-8 text-center mt-16">
+      <p>&copy; 2024 John Doe. Built with passion.</p>
+    </footer>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const apiTester: Template = {
+  id: "api-tester",
+  name: "API Tester",
+  description: "Simple REST API testing tool in the browser.",
+  files: [
+    {
+      path: "index.html",
+      contents: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>API Tester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="p-6 max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">API Tester</h1>
+    <div class="space-y-4 mb-6">
+      <div class="flex gap-2">
+        <select id="method" class="px-3 py-2 border rounded">
+          <option>GET</option>
+          <option>POST</option>
+          <option>PUT</option>
+          <option>DELETE</option>
+        </select>
+        <input id="url" type="text" placeholder="https://api.example.com/endpoint" class="flex-1 px-3 py-2 border rounded" />
+        <button onclick="sendRequest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Send</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Request Body (JSON)</label>
+        <textarea id="body" rows="4" class="w-full px-3 py-2 border rounded font-mono text-sm" placeholder='{"key": "value"}'></textarea>
+      </div>
+      <div id="loading" class="hidden">Loading...</div>
+      <div id="response" class="hidden">
+        <h2 class="font-bold mb-2">Response</h2>
+        <div class="flex gap-4 mb-2">
+          <span>Status: <span id="status"></span></span>
+          <span>Time: <span id="time"></span></span>
+        </div>
+        <pre id="responseBody" class="bg-gray-100 p-3 rounded overflow-auto text-sm"></pre>
+      </div>
+    </div>
+    <script>
+      async function sendRequest(){
+        const method = document.getElementById('method').value;
+        const url = document.getElementById('url').value;
+        const body = document.getElementById('body').value;
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('response').classList.add('hidden');
+        const start = Date.now();
+        try {
+          const opts = { method, headers: {'Content-Type':'application/json'} };
+          if (body && method !== 'GET') opts.body = body;
+          const res = await fetch(url, opts);
+          const time = Date.now() - start;
+          const text = await res.text();
+          let json;
+          try { json = JSON.parse(text); } catch { json = text; }
+          document.getElementById('status').textContent = res.status + ' ' + res.statusText;
+          document.getElementById('time').textContent = time + 'ms';
+          document.getElementById('responseBody').textContent = typeof json === 'string' ? json : JSON.stringify(json, null, 2);
+          document.getElementById('response').classList.remove('hidden');
+        } catch (err) {
+          document.getElementById('status').textContent = 'Error';
+          document.getElementById('time').textContent = '-';
+          document.getElementById('responseBody').textContent = err.message;
+          document.getElementById('response').classList.remove('hidden');
+        } finally {
+          document.getElementById('loading').classList.add('hidden');
+        }
+      }
+    </script>
+  </body>
+</html>`,
+    },
+  ],
+};
+
+const templates: Template[] = [
+  vanillaHtml,
+  spaRouter,
+  tailwindCdn,
+  mdStatic,
+  tailwindDark,
+  blogStatic,
+  todoApp,
+  dashboard,
+  landingPage,
+  portfolio,
+  apiTester,
+];
 
 export function TemplatesGallery() {
   const { createProject, upsertFile } = useProjectStore();
@@ -317,8 +678,14 @@ export function TemplatesGallery() {
             <CardTitle>{t.name}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">{t.description}</p>
-            <Button onClick={() => createFrom(t)} disabled={busy === t.id} aria-busy={busy === t.id}>
+            <p className="text-sm text-muted-foreground mb-2">
+              {t.description}
+            </p>
+            <Button
+              onClick={() => createFrom(t)}
+              disabled={busy === t.id}
+              aria-busy={busy === t.id}
+            >
               {busy === t.id ? "Creating..." : "Create from template"}
             </Button>
           </CardContent>

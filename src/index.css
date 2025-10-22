@@ -6,11 +6,26 @@
   color-scheme: light dark;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
 .bg-blur {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+/* Screen reader only utility class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

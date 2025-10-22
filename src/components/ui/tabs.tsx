@@ -3,7 +3,7 @@ import { cn } from "../../lib/utils";
 
 interface TabsContextValue {
   value: string;
-  onValueChange: (_value: string) => void;
+  onValueChange: (value: string) => void; // eslint-disable-line no-unused-vars
 }
 
 const TabsContext = React.createContext<TabsContextValue | undefined>(
@@ -20,7 +20,7 @@ function useTabsContext() {
 
 interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string;
-  onValueChange: (_value: string) => void;
+  onValueChange: (value: string) => void; // eslint-disable-line no-unused-vars
   defaultValue?: string;
   orientation?: "horizontal" | "vertical";
 }

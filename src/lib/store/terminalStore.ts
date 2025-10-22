@@ -5,7 +5,7 @@ type State = {
 };
 
 type Actions = {
-  append: (line: string) => void;
+  append: (line: string) => void; // eslint-disable-line no-unused-vars
   clear: () => void;
 };
 

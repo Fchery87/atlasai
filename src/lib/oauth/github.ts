@@ -67,13 +67,16 @@ export async function startGitHubOAuth(cfg: GitHubAuthConfig) {
   window.location.href = `${OAUTH_AUTHORIZE}?${params.toString()}`;
 }
 
-export async function completeGitHubOAuth(): Promise<{ access_token?: string; error?: string }> {
+export async function completeGitHubOAuth(): Promise<{
+  access_token?: string;
+  error?: string;
+}> {
   const url = new URL(window.location.href);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state") || "";
   const expected = sessionStorage.getItem("gh_oauth_state") || "";
   const code_verifier = sessionStorage.getItem("gh_code_verifier") || "";
-  const redirect_uri = sessionStorage.getItem("gh_redirect_uri") || "";
+  const _redirect_uri = sessionStorage.getItem("gh_redirect_uri") || "";
   const worker = sessionStorage.getItem("gh_worker_callback") || "";
 
   if (!code || state !== expected) {
@@ -110,12 +113,21 @@ export function clearGitHubToken() {
   localStorage.removeItem(SEC_TOKEN);
 }
 
-export async function saveGitHubClientConfig(clientId: string, workerUrl: string) {
+export async function saveGitHubClientConfig(
+  clientId: string,
+  workerUrl: string,
+) {
   await saveEncrypted(SEC_CLIENT_ID, clientId);
   await saveEncrypted(SEC_WORKER_URL, workerUrl);
 }
 
-export async function loadGitHubClientConfig(): Promise<{ clientId?: string; workerUrl?: string }> {
-  const [clientId, workerUrl] = await Promise.all([loadDecrypted(SEC_CLIENT_ID), loadDecrypted(SEC_WORKER_URL)]);
+export async function loadGitHubClientConfig(): Promise<{
+  clientId?: string;
+  workerUrl?: string;
+}> {
+  const [clientId, workerUrl] = await Promise.all([
+    loadDecrypted(SEC_CLIENT_ID),
+    loadDecrypted(SEC_WORKER_URL),
+  ]);
   return { clientId, workerUrl };
 }
