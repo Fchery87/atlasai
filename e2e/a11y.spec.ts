@@ -9,33 +9,48 @@ async function runAxe(page, contextName: string) {
       // "color-contrast"
     ]);
   const results = await axe.analyze();
-  const seriousOrWorse = results.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+  const seriousOrWorse = results.violations.filter(
+    (v) => v.impact === "critical" || v.impact === "serious",
+  );
   if (seriousOrWorse.length) {
-    console.error(`[a11y ${contextName}] serious/critical:`, seriousOrWorse.map((v) => v.id));
+    console.error(
+      `[a11y ${contextName}] serious/critical:`,
+      seriousOrWorse.map((v) => v.id),
+    );
   }
   // Threshold: allow 0 serious/critical
   expect(seriousOrWorse.length, `[a11y ${contextName}]`).toBe(0);
 }
 
 test.describe("Accessibility", () => {
-  test("main screen and interactions meet a11y thresholds", async ({ page }) => {
+  test("main screen and interactions meet a11y thresholds", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     // Core panels
-    await expect(page.getByRole("heading", { name: "Providers" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Providers" }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Files" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Editor (Monaco)" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Editor (Monaco)" }),
+    ).toBeVisible();
     await runAxe(page, "home");
 
     // Open command palette
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K",
+    );
     await expect(page.getByRole("dialog")).toBeVisible();
     await runAxe(page, "command-palette");
     await page.keyboard.press("Escape");
 
     // Snapshots panel interaction
-    await expect(page.getByRole("heading", { name: "Snapshots" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Snapshots" }),
+    ).toBeVisible();
     await runAxe(page, "snapshots");
 
     // Git/Deploy section

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
+import { useFocusTrap } from "../../lib/a11y/keyboard-nav";
 
 interface DialogContextValue {
   open: boolean;
@@ -135,8 +136,9 @@ export function DialogContent({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const { onOpenChange } = useDialogContext();
+  const { open, onOpenChange } = useDialogContext();
   const ref = React.useRef<HTMLDivElement>(null);
+  const focusTrapRef = useFocusTrap(open);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -149,11 +151,28 @@ export function DialogContent({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onOpenChange]);
 
+  // Merge refs
+  const mergedRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      ref.current = node;
+      if (focusTrapRef && typeof focusTrapRef === "object") {
+        (
+          focusTrapRef as React.MutableRefObject<HTMLDivElement | null>
+        ).current = node;
+      }
+    },
+    [focusTrapRef],
+  );
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <div
-        ref={ref}
+        ref={mergedRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+        aria-describedby="dialog-description"
         className={cn(
           "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
           className,
@@ -202,6 +221,7 @@ export function DialogTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
+      id="dialog-title"
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
         className,
@@ -216,6 +236,10 @@ export function DialogDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p
+      id="dialog-description"
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
   );
 }

@@ -3,7 +3,7 @@ name: Security Audit Report
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 4 * * 1' # weekly on Mondays
+    - cron: "0 4 * * 1" # weekly on Mondays
 
 jobs:
   audit:

@@ -31,7 +31,9 @@ export async function putProject(rec: IDBProjectRecord) {
   });
 }
 
-export async function getProject(id: string): Promise<IDBProjectRecord | undefined> {
+export async function getProject(
+  id: string,
+): Promise<IDBProjectRecord | undefined> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_PROJECTS, "readonly");

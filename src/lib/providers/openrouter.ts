@@ -1,4 +1,10 @@
-import type { ProviderAdapter, ProviderDefinition, ProviderPayload, DeltaChunk, CapabilitySet } from "./types";
+import type {
+  ProviderAdapter,
+  ProviderDefinition,
+  ProviderPayload,
+  DeltaChunk,
+  CapabilitySet,
+} from "./types";
 
 export const OpenRouterDef: ProviderDefinition = {
   id: "openrouter",
@@ -6,9 +12,7 @@ export const OpenRouterDef: ProviderDefinition = {
   baseUrl: "https://openrouter.ai/api/v1",
   auth: { type: "apiKey", keyName: "Authorization" }, // "Bearer <key>"
   headers: { "Content-Type": "application/json" },
-  models: [
-    { id: "openrouter/auto", supportsTools: true },
-  ],
+  models: [{ id: "openrouter/auto", supportsTools: true }],
 };
 
 export const OpenRouterAdapter: ProviderAdapter = {
@@ -29,7 +33,12 @@ export const OpenRouterAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
+  async *stream(
+    def,
+    creds,
+    payload: ProviderPayload,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<DeltaChunk> {
     const res = await fetch(`${def.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {

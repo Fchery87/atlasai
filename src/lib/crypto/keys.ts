@@ -12,7 +12,10 @@ export async function getMasterKey(): Promise<CryptoKey> {
     localStorage.setItem(MASTER_KEY_STORAGE, base64);
   }
   const raw = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 export async function encryptString(plaintext: string): Promise<string> {
@@ -43,7 +46,9 @@ export async function saveProviderKey(providerId: string, rawKey: string) {
   localStorage.setItem(PK_NS + providerId, encrypted);
 }
 
-export async function loadProviderKey(providerId: string): Promise<{ plaintext?: string; encrypted?: string }> {
+export async function loadProviderKey(
+  providerId: string,
+): Promise<{ plaintext?: string; encrypted?: string }> {
   const encrypted = localStorage.getItem(PK_NS + providerId) || undefined;
   if (!encrypted) return {};
   try {

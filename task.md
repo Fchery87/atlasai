@@ -1,11 +1,13 @@
 # BoltForge PRD Task Tracking
 
 Legend:
+
 - [x] Completed
 - [~] Partially complete / scaffolded
 - [ ] Not started
 
 ## 1) Overview / Vision (Docs)
+
 - [x] PRD defined and committed
 - [x] Project scaffolding: React + TS + Vite + Tailwind + Shadcn-style components
 - [x] BYOK philosophy and local-first posture reflected in architecture
@@ -13,6 +15,7 @@ Legend:
 ## 6) Functional Requirements
 
 ### 6.1 Prompt → Code
+
 - [x] Chat panel UI
   - [x] Model picker per message
   - [x] Attachments (text/code files + optional images for vision-capable providers)
@@ -24,6 +27,7 @@ Legend:
 - [x] Rollback via snapshots
 
 ### 6.2 Workspace & Files
+
 - [x] File tree: create/rename/delete
 - [x] Virtual folders, inline new file/folder, rename, delete
 - [x] Multi-select (Shift/Ctrl/Cmd), Select All, rubber-band selection
@@ -40,6 +44,7 @@ Legend:
 - [x] Push to GitHub (OAuth + contents/tree APIs, updates and deletes, .gitignore handling)
 
 ### 6.3 Run & Preview
+
 - [x] Terminal panel with bounded buffer and Clear
 - [x] Preview iframe with strict sandbox and CSP
 - [x] Console proxy postMessage bridge to Terminal
@@ -47,6 +52,7 @@ Legend:
 - [x] Templates gallery (Vanilla HTML, SPA Router, Tailwind CDN, Tailwind Dark Toggle, Markdown Static Blog)
 
 ### 6.4 Providers (BYOK) – Extensible LLM Registry
+
 - [x] Provider types (zod) and adapter interface
 - [x] Provider Manager UI with key validate/save/clear (encrypted WebCrypto)
 - [x] OpenRouter adapter
@@ -60,14 +66,16 @@ Legend:
 - [x] Credentials stored client-side encrypted; optional sync via OAuth not implemented
 
 ### 6.5 Deploy
+
 - [x] Presets for GitHub Pages / Netlify / Vercel (UI + status/logs)
 - [x] Provider-specific deploy flows and logs
   - GitHub Pages: upload to gh-pages; CI workflow provided
   - Netlify: hash-based incremental uploads
   - Vercel: project linking + config, then deployment request
-- [x] SPA routing guidance and helpers (GH Pages 404.html, Netlify _redirects, vercel.json rewrites)
+- [x] SPA routing guidance and helpers (GH Pages 404.html, Netlify \_redirects, vercel.json rewrites)
 
 ## 7) Nonfunctional Requirements
+
 - [~] Performance: lazy Monaco; Prettier parsers lazy; further profiling TBD
 - [x] Reliability: snapshots; local IndexedDB persistence
 - [x] Accessibility (WCAG 2.1 AA): ARIA labels; keyboard-first flows; Axe E2E checks across core interactions
@@ -75,22 +83,26 @@ Legend:
 - [x] Cost: $0 infra default
 
 ## 8) Detailed UI/UX – DSS
+
 - [x] Canonical shell with Bento grid (Header, Editor, Chat, Preview, Terminal)
 - [x] Resizable panes (SplitPane with persisted sizes + keyboard resizing + reset)
 - [x] Skip link and aria labels; breadcrumbs; aria-live on terminal output
 - [~] Component contracts: DiffView minimal; PromptInput and SplitPane contracts pending
 
 ## 9) Design System Component Map (Shadcn)
+
 - [x] Core UI (Card, Button, Input, Separator, etc.)
 - [ ] Full Shadcn CLI component set and advanced patterns (Tabs, Dialogs, Sheets)
 
 ## 10) Backend Architecture & Quality Specifications
+
 - [x] Storage: IndexedDB projects, encrypted localStorage for provider keys
 - [x] Serverless Worker: GitHub OAuth code exchange (PKCE) with CORS
 - [x] Deploy status polling endpoint
 - [ ] Optional LLM relay (BYOK-forwarding) with rate-limiting and scrubbing
 
 ## 12) CI/CD & Quality
+
 - [x] GitHub Actions CI: typecheck, lint, unit tests, build, Playwright E2E
 - [x] GitHub Pages workflow: build and deploy dist/ to Pages
 - [x] Security scanning: npm audit + OSV scanner on PRs and schedule
@@ -98,6 +110,7 @@ Legend:
 - [ ] Release: tag + changelog; Pages/Workers deploy via Actions
 
 ## 13) TDD Strategy
+
 - [x] Unit: crypto keys test, project store diffs/snapshots
 - [x] Unit: provider adapter tests (existing + new providers)
 - [x] Unit: deploy and git helpers (zip pack, sha1, delete calc)
@@ -108,12 +121,14 @@ Legend:
 ## 14) Roadmap & Phases
 
 Phase 0 (Seed)
+
 - [x] App shell + Bento
 - [x] Provider Manager (OpenRouter + Ollama) with encrypted persistence
 - [x] Project store (IndexedDB); ZIP import/export
 - [x] Monaco editor (lazy load)
 
 Phase 1 (Run & Diff)
+
 - [x] Diff approval pipeline; file lock
 - [x] Search
 - [x] Snapshots (create/restore, diff preview, selective apply)
@@ -121,6 +136,7 @@ Phase 1 (Run & Diff)
 - [x] Accessibility polish; keyboard shortcuts; Axe CI
 
 Phase 2 (Git & Deploy)
+
 - [x] GitHub OAuth Worker exchange (PKCE)
 - [x] Git import/push (with deletes, .gitignore, encrypted config)
 - [x] Deploy presets (GH Pages, Netlify hash-based, Vercel link+config) with logs
@@ -128,17 +144,20 @@ Phase 2 (Git & Deploy)
 - [x] Deploy status polling endpoint (optional)
 
 Phase 3 (LLM Extensibility)
+
 - [x] Additional providers (Groq, Anthropic Claude Code, GPT‑5 placeholder)
 - [x] Custom provider form w/ zod schema validation + encrypted headers
 - [x] Built-in overrides + duplicate customs
 
 Phase 4 (Polish & Desktop)
+
 - [x] Resizable split panes with persistence + keyboard controls
 - [x] Command palette
 - [ ] Offline caching / PWA
 - [ ] Optional Electron packaging
 
 ## 17) Acceptance Criteria (MVP)
+
 - [~] Create project → edit file → run preview → apply AI change → see diff → deploy to GH Pages
   - Current status: Chat can stream and stage diffs; manual approve applies; GH Pages deploy workflow present; SPA helpers included. E2E basic coverage exists; expand tests for full flow.
 - [x] Add provider via UI; validate key; use it in a chat that edits code
@@ -146,6 +165,7 @@ Phase 4 (Polish & Desktop)
 - [x] No server-side secret storage by default
 
 ## Summary
+
 - Phase 0–2: COMPLETE.
 - Phase 3: COMPLETE (additional providers, custom provider with zod + encrypted headers, overrides/duplication).
 - Remaining polish: Full E2E Prompt→Diff→Apply scenarios, provider adapter compliance tests, expanded template catalog, optional LLM relay, PWA/Electron.

@@ -53,13 +53,24 @@ const handler: ExportedHandler<Env> = {
       });
       const data = (await resp.json()) as any;
       if (!resp.ok || data.error) {
-        return json({ error: "oauth_exchange_failed", details: data }, { status: 400 });
+        return json(
+          { error: "oauth_exchange_failed", details: data },
+          { status: 400 },
+        );
       }
       // Return access_token to client (client stores it locally)
-      return json({ access_token: data.access_token, token_type: data.token_type, scope: data.scope, state });
+      return json({
+        access_token: data.access_token,
+        token_type: data.token_type,
+        scope: data.scope,
+        state,
+      });
     }
 
-    return new Response("Not Found", { status: 404, headers: { "access-control-allow-origin": "*" } });
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "access-control-allow-origin": "*" },
+    });
   },
 };
 

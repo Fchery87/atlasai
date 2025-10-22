@@ -34,9 +34,12 @@ const handler: ExportedHandler<Env> = {
       if (!id || !auth) {
         return json({ error: "missing_id_or_auth" }, { status: 400 });
       }
-      const resp = await fetch(`https://api.netlify.com/api/v1/deploys/${encodeURIComponent(id)}`, {
-        headers: { Authorization: auth },
-      });
+      const resp = await fetch(
+        `https://api.netlify.com/api/v1/deploys/${encodeURIComponent(id)}`,
+        {
+          headers: { Authorization: auth },
+        },
+      );
       const data = await resp.json().catch(() => ({}));
       return json({ ok: resp.ok, status: resp.status, data });
     }
@@ -48,14 +51,20 @@ const handler: ExportedHandler<Env> = {
       if (!id || !auth) {
         return json({ error: "missing_id_or_auth" }, { status: 400 });
       }
-      const resp = await fetch(`https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}`, {
-        headers: { Authorization: auth, "Content-Type": "application/json" },
-      });
+      const resp = await fetch(
+        `https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}`,
+        {
+          headers: { Authorization: auth, "Content-Type": "application/json" },
+        },
+      );
       const data = await resp.json().catch(() => ({}));
       return json({ ok: resp.ok, status: resp.status, data });
     }
 
-    return new Response("Not Found", { status: 404, headers: { "access-control-allow-origin": "*" } });
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "access-control-allow-origin": "*" },
+    });
   },
 };
 

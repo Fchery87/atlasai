@@ -4,7 +4,9 @@ import { useProjectStore } from "../../lib/store/projectStore";
 export function SearchBar() {
   const { current, selectFile } = useProjectStore();
   const [q, setQ] = React.useState("");
-  const [results, setResults] = React.useState<Array<{ path: string; line: number; snippet: string }>>([]);
+  const [results, setResults] = React.useState<
+    Array<{ path: string; line: number; snippet: string }>
+  >([]);
 
   React.useEffect(() => {
     if (!q.trim()) {
@@ -18,7 +20,11 @@ export function SearchBar() {
       const lines = f.contents.split(/\r?\n/);
       lines.forEach((line, idx) => {
         if (line.toLowerCase().includes(needle)) {
-          res.push({ path: f.path, line: idx + 1, snippet: line.trim().slice(0, 120) });
+          res.push({
+            path: f.path,
+            line: idx + 1,
+            snippet: line.trim().slice(0, 120),
+          });
         }
       });
     }
@@ -43,12 +49,17 @@ export function SearchBar() {
                 onClick={() => selectFile(r.path)}
                 aria-label={`Open ${r.path}`}
               >
-                <span className="font-mono text-xs">{r.path}</span> · <span className="text-xs text-muted-foreground">L{r.line}</span>
-                <div className="text-muted-foreground truncate">{r.snippet}</div>
+                <span className="font-mono text-xs">{r.path}</span> ·{" "}
+                <span className="text-xs text-muted-foreground">L{r.line}</span>
+                <div className="text-muted-foreground truncate">
+                  {r.snippet}
+                </div>
               </button>
             </li>
           ))}
-          {results.length === 0 && <li className="text-muted-foreground">No results</li>}
+          {results.length === 0 && (
+            <li className="text-muted-foreground">No results</li>
+          )}
         </ul>
       )}
     </div>

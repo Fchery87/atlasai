@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
+import { useFocusTrap } from "../../lib/a11y/keyboard-nav";
 
 interface SheetContextValue {
   open: boolean;
@@ -145,8 +146,9 @@ export function SheetContent({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const { onOpenChange, side } = useSheetContext();
+  const { open, onOpenChange, side } = useSheetContext();
   const ref = React.useRef<HTMLDivElement>(null);
+  const focusTrapRef = useFocusTrap(open);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -159,11 +161,28 @@ export function SheetContent({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onOpenChange]);
 
+  // Merge refs
+  const mergedRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      ref.current = node;
+      if (focusTrapRef && typeof focusTrapRef === "object") {
+        (
+          focusTrapRef as React.MutableRefObject<HTMLDivElement | null>
+        ).current = node;
+      }
+    },
+    [focusTrapRef],
+  );
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <div
-        ref={ref}
+        ref={mergedRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sheet-title"
+        aria-describedby="sheet-description"
         className={cn(
           "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
           sideStyles[side],
@@ -213,6 +232,7 @@ export function SheetTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
+      id="sheet-title"
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
         className,
@@ -227,7 +247,11 @@ export function SheetDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p
+      id="sheet-description"
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
   );
 }
 

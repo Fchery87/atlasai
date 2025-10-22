@@ -16,6 +16,7 @@ This document describes all dependencies and complete instructions to install, d
 ## Dependencies
 
 Runtime dependencies (from package.json):
+
 - react, react-dom
 - zod (schema validation)
 - @monaco-editor/react, monaco-editor
@@ -24,10 +25,11 @@ Runtime dependencies (from package.json):
 - jszip (ZIP import/export)
 
 Dev dependencies:
+
 - typescript
 - vite, @vitejs/plugin-react
 - tailwindcss, postcss, autoprefixer
-- eslint, @typescript-eslint/*, eslint-config-prettier, eslint-plugin-react-hooks, globals
+- eslint, @typescript-eslint/\*, eslint-config-prettier, eslint-plugin-react-hooks, globals
 - vitest, @vitest/coverage-v8
 - @playwright/test
 - @axe-core/playwright (accessibility E2E)
@@ -35,22 +37,27 @@ Dev dependencies:
 - husky, lint-staged
 
 Cloudflare Workers (optional):
+
 - wrangler (installed globally or via npx)
 
 ## Installation
 
-1) Install project dependencies
+1. Install project dependencies
+
 - npm install
   - In CI we use `npm ci` for reproducible installs; you can use it locally if desired.
 
-2) Initialize Husky precommit hooks (optional, recommended)
+2. Initialize Husky precommit hooks (optional, recommended)
+
 - npm run prepare
   - This runs Husky setup and enables the `.husky/pre-commit` hook to run lint-staged.
 
-3) Install Playwright browsers for E2E tests (optional)
+3. Install Playwright browsers for E2E tests (optional)
+
 - npx playwright install --with-deps
 
-4) (Optional) Run security checks locally
+4. (Optional) Run security checks locally
+
 - npm run security
   - Runs `npm audit` and OSV scanner over the repo
 - npm run security:fix
@@ -59,14 +66,17 @@ Cloudflare Workers (optional):
 ## Development
 
 Start the dev server (Vite):
+
 - npm run dev
 - The app runs at http://localhost:5173 by default.
 
 Tailwind
+
 - Tailwind is configured via tailwind.config.ts and postcss.config.js.
 - Styles are imported in src/index.css; Tailwind classes are used in components.
 
 Monaco Editor
+
 - Monaco is lazy-loaded by @monaco-editor/react; editor and diff editor are integrated in EditorPanel and DiffPanel.
 
 ## Project Features and Flow
@@ -92,7 +102,7 @@ Monaco Editor
 - Deploy
   - GitHub Pages, Netlify, Vercel integrations from DeployPanel.
   - GitHub Pages CI workflow generator; Netlify hash-based deploys; Vercel project link/config + deploy.
-  - SPA helpers: add GH Pages 404.html, Netlify _redirects, Vercel rewrites.
+  - SPA helpers: add GH Pages 404.html, Netlify \_redirects, Vercel rewrites.
   - Optional deploy status polling via Cloudflare Worker.
 
 - Git Integration
@@ -118,6 +128,7 @@ Monaco Editor
 ## Precommit Hooks
 
 Configured via:
+
 - package.json: `"prepare": "husky install"`
 - `.husky/pre-commit` runs `lint-staged`
 - lint-staged:
@@ -136,14 +147,17 @@ Configured via:
 ## Cloudflare Workers (Optional)
 
 OAuth Worker (GitHub)
+
 - workers/oauth/wrangler.toml and workers/oauth/src/index.ts
 - Purpose: PKCE OAuth code exchange; enables client-only BYOK with GitHub import/push.
 
 Deploy Status Worker
+
 - workers/deploy-status/wrangler.toml and workers/deploy-status/src/index.ts
 - Purpose: status polling endpoints for Netlify/Vercel with CORS.
 
 Deploying Workers
+
 - Install wrangler: `npm install -g wrangler` or use `npx wrangler`
 - Configure secrets:
   - For OAuth Worker: `wrangler secrets put GITHUB_CLIENT_ID`, `wrangler secrets put GITHUB_CLIENT_SECRET`
@@ -153,6 +167,7 @@ Deploying Workers
 ## Provider Keys (Encrypted Storage)
 
 Provider Manager uses WebCrypto AES-GCM to encrypt/decrypt:
+
 - Keys saved per provider id via saveProviderKey/loadProviderKey
 - Custom headers saved under `sec_provider_headers:<providerId>` encrypted
 - UI hints and help toggles are also saved encrypted per project or globally.
@@ -160,21 +175,25 @@ Provider Manager uses WebCrypto AES-GCM to encrypt/decrypt:
 ## Deploy Targets
 
 GitHub Pages
+
 - Provide `owner/repo`, sign in via GitPanel using OAuth Worker URL + Client ID.
 - Click Deploy to push files to `gh-pages`.
 - Use “Download GH Pages Workflow” to add CI build/deploy automation.
 
 Netlify
+
 - Provide token and site ID.
 - Uses hash-based deployment; uploads only required files.
 - Optional status polling via Deploy Status Worker.
 
 Vercel
+
 - Provide token and project name.
 - Creates or patches project settings (framework/build/output) and requests deployment.
 - Optional status polling via Deploy Status Worker.
 
 SPA Routing Helpers
+
 - In DeployPanel, buttons to add:
   - GitHub Pages 404.html → redirects 404s to index.html with path preserved in hash.
   - Netlify `_redirects` → `/* /index.html 200`

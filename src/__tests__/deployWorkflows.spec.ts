@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { generateGhPagesWorkflow, generateUserGhPagesWorkflow } from "../lib/deploy/workflows";
+import {
+  generateGhPagesWorkflow,
+  generateUserGhPagesWorkflow,
+} from "../lib/deploy/workflows";
 
 describe("workflow generators", () => {
   it("generates GH Pages workflow with custom branch", () => {

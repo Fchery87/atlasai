@@ -1,4 +1,7 @@
-async function tryPrettier(lang: string | undefined, text: string): Promise<string | null> {
+async function tryPrettier(
+  lang: string | undefined,
+  text: string,
+): Promise<string | null> {
   try {
     let parser: string | null = null;
     switch (lang) {
@@ -46,14 +49,20 @@ async function tryPrettier(lang: string | undefined, text: string): Promise<stri
       const p = await import("prettier/plugins/yaml");
       plugins.push(p.default || p);
     }
-    const formatted = await prettier.format(text, { parser: parser as any, plugins });
+    const formatted = await prettier.format(text, {
+      parser: parser as any,
+      plugins,
+    });
     return formatted;
   } catch {
     return null;
   }
 }
 
-export async function formatContentAsync(lang: string | undefined, text: string): Promise<string> {
+export async function formatContentAsync(
+  lang: string | undefined,
+  text: string,
+): Promise<string> {
   // Prefer Prettier when applicable
   const pretty = await tryPrettier(lang, text);
   if (pretty != null) return pretty;

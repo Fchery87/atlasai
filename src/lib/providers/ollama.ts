@@ -1,4 +1,10 @@
-import type { ProviderAdapter, ProviderDefinition, ProviderPayload, DeltaChunk, CapabilitySet } from "./types";
+import type {
+  ProviderAdapter,
+  ProviderDefinition,
+  ProviderPayload,
+  DeltaChunk,
+  CapabilitySet,
+} from "./types";
 
 export const OllamaDef: ProviderDefinition = {
   id: "ollama",
@@ -22,7 +28,12 @@ export const OllamaAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, _creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
+  async *stream(
+    def,
+    _creds,
+    payload: ProviderPayload,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<DeltaChunk> {
     const res = await fetch(`${def.baseUrl}/chat`, {
       method: "POST",
       headers: def.headers ?? {},

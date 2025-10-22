@@ -1,11 +1,20 @@
-import type { ProviderAdapter, ProviderDefinition, ProviderPayload, DeltaChunk, CapabilitySet } from "./types";
+import type {
+  ProviderAdapter,
+  ProviderDefinition,
+  ProviderPayload,
+  DeltaChunk,
+  CapabilitySet,
+} from "./types";
 
 export const AnthropicDef: ProviderDefinition = {
   id: "anthropic",
   name: "Anthropic Claude",
   baseUrl: "https://api.anthropic.com/v1",
   auth: { type: "apiKey", keyName: "x-api-key" },
-  headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
+  headers: {
+    "Content-Type": "application/json",
+    "anthropic-version": "2023-06-01",
+  },
   models: [
     { id: "claude-3-opus-20240229", supportsTools: true },
     { id: "claude-3-sonnet-20240229", supportsTools: true },
@@ -17,10 +26,14 @@ function toAnthropicMessages(payload: ProviderPayload) {
   // Convert simple role/content messages to Anthropic Messages API format
   // Anthropic expects a single system prompt and a user/assistant turn list
   let system: string | undefined = undefined;
-  const conv: Array<{ role: "user" | "assistant"; content: Array<{ type: "text"; text: string }> }> = [];
+  const conv: Array<{
+    role: "user" | "assistant";
+    content: Array<{ type: "text"; text: string }>;
+  }> = [];
   for (const m of payload.messages) {
     if (m.role === "system") system = m.content;
-    else conv.push({ role: m.role, content: [{ type: "text", text: m.content }] });
+    else
+      conv.push({ role: m.role, content: [{ type: "text", text: m.content }] });
   }
   return { system, messages: conv };
 }
@@ -43,7 +56,12 @@ export const AnthropicAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
+  async *stream(
+    def,
+    creds,
+    payload: ProviderPayload,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<DeltaChunk> {
     const { system, messages } = toAnthropicMessages(payload);
     const res = await fetch(`${def.baseUrl}/messages`, {
       method: "POST",

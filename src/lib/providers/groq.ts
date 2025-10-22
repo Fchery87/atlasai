@@ -1,4 +1,10 @@
-import type { ProviderAdapter, ProviderDefinition, ProviderPayload, DeltaChunk, CapabilitySet } from "./types";
+import type {
+  ProviderAdapter,
+  ProviderDefinition,
+  ProviderPayload,
+  DeltaChunk,
+  CapabilitySet,
+} from "./types";
 
 export const GroqDef: ProviderDefinition = {
   id: "groq",
@@ -31,7 +37,12 @@ export const GroqAdapter: ProviderAdapter = {
       return { ok: false, message: e?.message ?? "Network error" };
     }
   },
-  async *stream(def, creds, payload: ProviderPayload, opts?: { signal?: AbortSignal }): AsyncIterable<DeltaChunk> {
+  async *stream(
+    def,
+    creds,
+    payload: ProviderPayload,
+    opts?: { signal?: AbortSignal },
+  ): AsyncIterable<DeltaChunk> {
     const res = await fetch(`${def.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
