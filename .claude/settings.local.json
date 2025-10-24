@@ -8,7 +8,19 @@
       "Bash(claude mcp:*)",
       "Read(//home/teksmabrep/.claude/**)",
       "Read(//home/teksmabrep/**)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Read(//mnt/c/Users/Frant/OneDrive/Documents/**)",
+      "Bash(npm install)",
+      "Bash(cd:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_install",
+      "Bash(npm run dev:*)",
+      "Read(//mnt/c/Users/**)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(npm install:*)",
+      "Bash(npx lint-staged:*)",
+      "Bash(git config:*)"
     ],
     "deny": [],
     "ask": []

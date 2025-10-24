@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import App from "./App-Modern"; // Using modern 2-panel layout
 import "./index.css";
 import { initializeAnnouncer } from "./lib/a11y/screen-reader";
 import { registerServiceWorker, isStandalone } from "./lib/pwa/register";

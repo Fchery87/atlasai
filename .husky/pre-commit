@@ -1,2 +1,2 @@
 #!/bin/sh
-npm run precommit:lint
+node node_modules/lint-staged/bin/lint-staged.js

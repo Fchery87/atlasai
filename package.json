@@ -14,7 +14,7 @@
     "test:ui": "vitest",
     "e2e": "playwright test",
     "prepare": "husky",
-    "precommit:lint": "lint-staged",
+    "precommit:lint": "npx lint-staged",
     "security": "npm run security:audit && npm run security:osv",
     "security:audit": "npm audit",
     "security:fix": "npm audit fix",
@@ -60,7 +60,7 @@
     "globals": "^15.9.0",
     "husky": "^9.1.6",
     "jsdom": "^27.0.1",
-    "lint-staged": "^15.2.10",
+    "lint-staged": "^15.5.2",
     "postcss": "^8.4.47",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.14",
@@ -70,10 +70,10 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md,yml,yaml}": [
-      "prettier --write"
+      "node node_modules/prettier/bin/prettier.cjs --write"
     ],
     "*.{ts,tsx,js,jsx}": [
-      "eslint --config eslint.config.js --fix"
+      "node node_modules/eslint/bin/eslint.js --config eslint.config.js --fix"
     ]
   }
 }

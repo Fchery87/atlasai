@@ -1,37 +1,67 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = {
+export default {
   darkMode: ["class"],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        border: "hsl(214 32% 91%)",
-        input: "hsl(214 32% 91%)",
-        ring: "hsl(222.2 47.4% 11.2%)",
-        background: "white",
-        foreground: "hsl(222.2 84% 4.9%)",
+        border: "hsl(220 13% 91%)",
+        input: "hsl(220 13% 91%)",
+        ring: "hsl(262 83% 58%)",
+        background: "hsl(0 0% 100%)",
+        foreground: "hsl(224 71% 4%)",
         card: {
-          DEFAULT: "white",
-          foreground: "hsl(222.2 84% 4.9%)",
+          DEFAULT: "hsl(0 0% 100%)",
+          foreground: "hsl(224 71% 4%)",
+        },
+        popover: {
+          DEFAULT: "hsl(0 0% 100%)",
+          foreground: "hsl(224 71% 4%)",
         },
         muted: {
-          DEFAULT: "hsl(210 40% 96.1%)",
-          foreground: "hsl(215.4 16.3% 46.9%)",
+          DEFAULT: "hsl(220 14% 96%)",
+          foreground: "hsl(220 9% 46%)",
+        },
+        accent: {
+          DEFAULT: "hsl(262 83% 58%)",
+          foreground: "hsl(0 0% 100%)",
         },
         primary: {
-          DEFAULT: "hsl(222.2 47.4% 11.2%)",
-          foreground: "white",
+          DEFAULT: "hsl(262 83% 58%)",
+          foreground: "hsl(0 0% 100%)",
         },
         secondary: {
-          DEFAULT: "hsl(210 40% 96.1%)",
-          foreground: "hsl(222.2 47.4% 11.2%)",
+          DEFAULT: "hsl(220 14% 96%)",
+          foreground: "hsl(224 71% 4%)",
+        },
+        destructive: {
+          DEFAULT: "hsl(0 84% 60%)",
+          foreground: "hsl(0 0% 100%)",
+        },
+        success: {
+          DEFAULT: "hsl(142 71% 45%)",
+          foreground: "hsl(0 0% 100%)",
+        },
+        warning: {
+          DEFAULT: "hsl(38 92% 50%)",
+          foreground: "hsl(0 0% 100%)",
         },
       },
       borderRadius: {
-        lg: "12px",
-        md: "10px",
-        sm: "8px",
+        lg: "0.5rem",
+        md: "0.375rem",
+        sm: "0.25rem",
+      },
+      fontSize: {
+        xs: ["0.75rem", { lineHeight: "1rem" }],
+        sm: ["0.875rem", { lineHeight: "1.25rem" }],
+        base: ["0.9375rem", { lineHeight: "1.5rem" }],
+      },
+      boxShadow: {
+        sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        DEFAULT:
+          "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        md: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+        lg: "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
     },
   },
